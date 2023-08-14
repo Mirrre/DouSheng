@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 run_command: ./simple-demo
+=======
+run_command: "go run main.go"
+>>>>>>> 2baafd3 (Initial commit)
 debug:
   support: true
   launch:
@@ -6,5 +10,9 @@ debug:
     mode: debug
     program: .
     console: integratedTerminal
+<<<<<<< HEAD
     cwd: .
 compile_command: go build
+=======
+    cwd: .
+>>>>>>> 2baafd3 (Initial commit)
