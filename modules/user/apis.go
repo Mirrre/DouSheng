@@ -2,6 +2,7 @@ package user
 
 import (
   "app/modules/models"
+  "app/utils"
 	"errors"
 	"net/http"
 	"github.com/gin-gonic/gin"
@@ -11,43 +12,53 @@ import (
 
 // Register 处理用户注册的API请求
 func Register(c *gin.Context) {
-	var user models.User
+  	var user models.User
+  
+    user.Username = c.PostForm("username")
+    user.Password = c.PostForm("password")
+    if len(user.Username) < 6 || len(user.Password) < 6 || len(user.Username) > 25 || len(user.Password) > 25 {
+        c.JSON(http.StatusBadRequest, gin.H{
+          "status_code": 1,
+          "status_msg": "Username and Password should be non-empty and between 6 - 25 characters.",
+          "user_id": nil,
+          "username": user.Username,
+        })
+        return
+    }
+  
+  	// 使用GORM将用户数据存储到数据库中
+  	db := c.MustGet("db").(*gorm.DB)
+  	if err := db.Create(&user).Error; err != nil {
+  		c.JSON(http.StatusBadRequest, gin.H{
+          "status_code": 1,
+          "status_msg": "Failed to register",
+          "user_id": nil,
+        })
+  		return
+  	}
 
-  user.Username = c.PostForm("username")
-  user.Password = c.PostForm("password")
-  if len(user.Username) < 6 || len(user.Password) < 6 || len(user.Username) > 25 || len(user.Password) > 25 {
-      c.JSON(http.StatusBadRequest, gin.H{
-        "status_code": 1,
-        "status_msg": "Username and Password should be non-empty and between 6 - 25 characters.",
-        "user_id": nil,
-        "username": user.Username,
-      })
-      return
-  }
-
-	// 使用GORM将用户数据存储到数据库中
-	db := c.MustGet("db").(*gorm.DB)
-	if err := db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-        "status_code": 1,
-        "status_msg": "Failed to register",
-        "user_id": nil,
-      })
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-    "status_code": 0,
-    "status_msg": "Registered!",
-    "user_id": user.ID,
-    // "token": "token_string",
-  })
+    // 生成新Token
+    newToken, err := utils.GenerateToken(user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "status_code": 1,
+            "status_msg": "Failed to generate token",
+            "user_id": user.ID,
+        })
+        return
+    }
+  
+  	c.JSON(http.StatusCreated, gin.H{
+      "status_code": 0,
+      "status_msg": "Registered!",
+      "user_id": user.ID,
+      "token": newToken,
+    })
 }
 
 // GetUser 处理获取单个用户的API请求
 func GetUser(c *gin.Context) {
-    // 从路径中获取用户ID
-    id := c.Query("id")
+    id := c.Query("id")  // 从路径中获取用户ID
 
     // 将ID从字符串转换为uint
     userID, err := strconv.ParseUint(id, 10, 32)
@@ -111,14 +122,22 @@ func Login(c *gin.Context) {
         return
     }
 
-    // TODO: token
-    // token := "generated_token"
+    // 生成新Token
+    newToken, err := utils.GenerateToken(user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "status_code": 1,
+            "status_msg": "Failed to generate token",
+            "user_id": user.ID,
+        })
+        return
+    }
 
     c.JSON(http.StatusOK, gin.H{
         "status_code": 0,
         "status_msg": "Logged in successfully",
         "user_id": user.ID,
-        // "token": token,
+        "token": newToken,
     })
 }
 
