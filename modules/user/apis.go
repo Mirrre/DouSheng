@@ -13,8 +13,8 @@ import (
 func Register(c *gin.Context) {
 	var user models.User
 
-  user.Username = c.PostForm("Username")
-  user.Password = c.PostForm("Password")
+  user.Username = c.PostForm("username")
+  user.Password = c.PostForm("password")
   if len(user.Username) < 6 || len(user.Password) < 6 || len(user.Username) > 25 || len(user.Password) > 25 {
       c.JSON(http.StatusBadRequest, gin.H{
         "status_code": 1,
@@ -80,8 +80,8 @@ func Login(c *gin.Context) {
     var inputUser models.User
 
     // 从 PostForm 中提取用户名和密码
-    inputUser.Username = c.PostForm("Username")
-    inputUser.Password = c.PostForm("Password")
+    inputUser.Username = c.PostForm("username")
+    inputUser.Password = c.PostForm("password")
 
     // 验证用户名密码非空
     if inputUser.Username == "" || inputUser.Password == "" {
