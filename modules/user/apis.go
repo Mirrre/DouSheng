@@ -4,18 +4,18 @@ import (
   "app/modules/models"
   "app/utils"
 	"errors"
-	"net/http"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-  "strconv"
+  "net/http"
 )
 
 // Register 处理用户注册的API请求
 func Register(c *gin.Context) {
   	var user models.User
   
-    user.Username = c.PostForm("username")
-    user.Password = c.PostForm("password")
+    user.Username = c.Query("username")
+    user.Password = c.Query("password")
     if len(user.Username) < 6 || len(user.Password) < 6 || len(user.Username) > 25 || len(user.Password) > 25 {
         c.JSON(http.StatusBadRequest, gin.H{
           "status_code": 1,
@@ -23,18 +23,20 @@ func Register(c *gin.Context) {
           "user_id": nil,
           "username": user.Username,
         })
+        fmt.Println(http.StatusBadRequest, "Username and Password should be non-empty and between 6 - 25 characters.")
         return
     }
   
   	// 使用GORM将用户数据存储到数据库中
   	db := c.MustGet("db").(*gorm.DB)
   	if err := db.Create(&user).Error; err != nil {
-  		c.JSON(http.StatusBadRequest, gin.H{
-          "status_code": 1,
-          "status_msg": "Failed to register",
-          "user_id": nil,
-        })
-  		return
+    		c.JSON(http.StatusBadRequest, gin.H{
+            "status_code": 1,
+            "status_msg": "Failed to register.",
+            "user_id": nil,
+          })
+        fmt.Println(http.StatusBadRequest, "Failed to register.")
+    		return
   	}
 
     // 生成新Token
@@ -42,9 +44,10 @@ func Register(c *gin.Context) {
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{
             "status_code": 1,
-            "status_msg": "Failed to generate token",
+            "status_msg": "Failed to generate token.",
             "user_id": user.ID,
         })
+        fmt.Println(http.StatusInternalServerError, "Failed to generate token.")
         return
     }
   
@@ -54,34 +57,43 @@ func Register(c *gin.Context) {
       "user_id": user.ID,
       "token": newToken,
     })
+    fmt.Println(http.StatusCreated, "Registered!")
 }
 
 // GetUser 处理获取单个用户的API请求
 func GetUser(c *gin.Context) {
-    id := c.Query("id")  // 从路径中获取用户ID
-
-    // 将ID从字符串转换为uint
-    userID, err := strconv.ParseUint(id, 10, 32)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-        return
-    }
+    id := c.Query("user_id")  // 从路径中获取用户ID
 
     var user models.User
     db := c.MustGet("db").(*gorm.DB)
-    if err := db.First(&user, userID).Error; err != nil {
+    if err := db.First(&user, id).Error; err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
-            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found."})
+            fmt.Println(http.StatusNotFound, "User not found.")
         } else {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error."})
+            fmt.Println(http.StatusInternalServerError, "Database error.")
         }
         return
     }
 
+    userResponse := map[string]interface{}{
+        "id":              user.ID,
+        "name":            user.Username,
+        "follow_count":    user.Profile.FollowCount,
+        "avatar":          user.Profile.Avatar,
+        "background_image": user.Profile.Background,
+        "signature":       user.Profile.Signature,
+        "total_favorited": user.Profile.TotalFavorited,
+        "work_count":      user.Profile.WorkCount,
+        "favorite_count":  user.Profile.FavoriteCount,
+    }
+
+    fmt.Println(http.StatusOK, userResponse)
     c.JSON(http.StatusOK, gin.H{
-      "status_code": 0,
-      "status_msg": "OK",
-      "user": user,
+        "status_code": 0,
+        "status_msg": "OK",
+        "user": userResponse,
     })
 }
 
@@ -91,15 +103,16 @@ func Login(c *gin.Context) {
     var inputUser models.User
 
     // 从 PostForm 中提取用户名和密码
-    inputUser.Username = c.PostForm("username")
-    inputUser.Password = c.PostForm("password")
+    inputUser.Username = c.Query("username")
+    inputUser.Password = c.Query("password")
 
     // 验证用户名密码非空
     if inputUser.Username == "" || inputUser.Password == "" {
         c.JSON(http.StatusUnauthorized, gin.H{
             "status_code": 1,
-            "status_msg": "Username of Password is missing.",
+            "status_msg": "Username or Password is missing.",
         })
+        fmt.Println(http.StatusUnauthorized, "Username or Password is missing.")
         return
     }
 
@@ -108,8 +121,9 @@ func Login(c *gin.Context) {
     if err := db.Where("username = ?", inputUser.Username).First(&user).Error; err != nil {
         c.JSON(http.StatusUnauthorized, gin.H{
             "status_code": 1,
-            "status_msg": "User not found",
+            "status_msg": "User not found.",
         })
+        fmt.Println(http.StatusUnauthorized, "User not found.")
         return
     }
 
@@ -117,8 +131,9 @@ func Login(c *gin.Context) {
     if user.Password != inputUser.Password {
         c.JSON(http.StatusUnauthorized, gin.H{
             "status_code": 1,
-            "status_msg": "Incorrect password",
+            "status_msg": "Incorrect password.",
         })
+        fmt.Println(http.StatusUnauthorized, "Incorrect password.")
         return
     }
 
@@ -127,17 +142,19 @@ func Login(c *gin.Context) {
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{
             "status_code": 1,
-            "status_msg": "Failed to generate token",
+            "status_msg": "Failed to generate token.",
             "user_id": user.ID,
         })
+        fmt.Println(http.StatusInternalServerError, "Failed to generate token.")
         return
     }
 
     c.JSON(http.StatusOK, gin.H{
         "status_code": 0,
-        "status_msg": "Logged in successfully",
+        "status_msg": "Logged in successfully.",
         "user_id": user.ID,
         "token": newToken,
     })
+    fmt.Println(http.StatusOK, "Logged in successfully.")
 }
 

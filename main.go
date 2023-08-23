@@ -4,7 +4,6 @@ import (
   "app/middleware"
   "app/modules/models"
   "app/modules/user"
-  "app/utils"
   "fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"

@@ -24,4 +24,5 @@ type UserProfile struct {
   	FollowerCount  int
   	TotalFavorited int
   	WorkCount      int
+    FavoriteCount  int
 }
