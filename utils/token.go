@@ -12,9 +12,9 @@ var jwtKey = []byte("a_secret_key")  // TODO: how to make the secret key more se
 func GenerateToken(userID uint) (string, error) {
     // 自定义Token的声明，声明可以理解为一个JSON数据包，包含了我们想要封装在Token里面的信息
     claims := jwt.MapClaims{
-      "user_id": userID,
-      // exp - 过期时间，格式为Unix时间戳
-      "exp": time.Now().Add(24 * time.Hour).Unix(),
+        "user_id": userID,
+        // exp - 过期时间，格式为Unix时间戳. TODO: set 1 sec for testing
+        "exp": time.Now().Add(24 * time.Hour).Unix(),
     }
 
     // 利用claims生成一个Token

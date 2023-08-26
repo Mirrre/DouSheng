@@ -9,7 +9,6 @@ import (
 
 func Authentication() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // tokenString := c.GetHeader("Authorization")
         tokenString := c.Query("token")
 
         userID, err := utils.ValidateToken(tokenString)
