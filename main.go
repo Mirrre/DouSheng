@@ -1,9 +1,9 @@
 package main
 
 import (
+	"app/config"
 	"app/middleware"
 	"app/modules/user"
-  "app/config"
 )
 
 func main() {
@@ -14,10 +14,10 @@ func main() {
 	}
 
 	r := config.InitGinEngine(db)
-	
+
 	r.POST("/douyin/user/register/", user.Register)
 	r.GET("/douyin/user/", middleware.Authentication(), user.GetUser)
 	r.POST("/douyin/user/login/", user.Login)
-	
+
 	r.Run(":8080")
 }
