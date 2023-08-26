@@ -5,3 +5,5 @@
 .nfs*
 node_modules
 .idea/
+*.jpg
+*.mp4
