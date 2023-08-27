@@ -12,7 +12,7 @@ import (
 
 const MaxVideos = 5
 
-type FeedResponse struct {
+type Response struct {
 	StatusCode int            `json:"status_code"`
 	StatusMsg  string         `json:"status_msg"`
 	NextTime   int64          `json:"next_time"`
@@ -56,7 +56,7 @@ func GetFeed(c *gin.Context) {
 	// 尝试将输入的字符串解析为毫秒为单位的Unix时间戳
 	unixTimeMs, err := strconv.ParseInt(latestTimeString, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, FeedResponse{
+		c.JSON(http.StatusBadRequest, Response{
 			StatusCode: 1,
 			StatusMsg:  "Error: Invalid latest_time format. Expected Unix timestamp in milliseconds.",
 		})
@@ -69,9 +69,9 @@ func GetFeed(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	err = db.Preload("User").Preload("User.Profile").
 		Where("publish_time < ?", latestTime).Order("publish_time desc").
-		Limit(10).Find(&videos).Error
+		Limit(MaxVideos).Find(&videos).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, FeedResponse{
+		c.JSON(http.StatusInternalServerError, Response{
 			StatusCode: 1,
 			StatusMsg:  "Error: Can't fetch videos.",
 		})
@@ -109,7 +109,7 @@ func GetFeed(c *gin.Context) {
 		nextTime = videos[len(videos)-1].PublishTime.Unix()
 	}
 
-	resp := FeedResponse{
+	resp := Response{
 		StatusCode: 0,
 		StatusMsg:  "Success",
 		NextTime:   nextTime,
@@ -117,4 +117,61 @@ func GetFeed(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func GetUserVideos(c *gin.Context) {
+	var videos []models.Video
+
+	// validate user_id
+	userId := c.DefaultQuery("user_id", "0")
+	if userIdInt, err := strconv.Atoi(userId); err != nil || userIdInt < 1 {
+		c.JSON(http.StatusBadRequest, Response{
+			StatusCode: 1,
+			StatusMsg:  "Invalid user_id.",
+		})
+		return
+	}
+
+	// fetch videos published by user_id
+	db := c.MustGet("db").(*gorm.DB)
+	err := db.Preload("User").Preload("User.Profile").
+		Where("user_id = ?", userId).Order("publish_time desc").
+		Find(&videos).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			StatusCode: 1,
+			StatusMsg:  "Error fetching videos.",
+		})
+		return
+	}
+
+	var videoResList []FeedVideoRes
+	for _, v := range videos {
+		videoResList = append(videoResList, FeedVideoRes{
+			ID:            v.ID,
+			PlayUrl:       v.PlayUrl,
+			CoverUrl:      v.CoverUrl,
+			FavoriteCount: v.FavoriteCount,
+			CommentCount:  v.CommentCount,
+			Title:         v.Title,
+			Author: AuthorRes{
+				ID:             v.User.ID,
+				Name:           v.User.Username,
+				Avatar:         v.User.Profile.Avatar,
+				Background:     v.User.Profile.Background,
+				Signature:      v.User.Profile.Signature,
+				FollowCount:    v.User.Profile.FollowCount,
+				FollowerCount:  v.User.Profile.FollowerCount,
+				TotalFavorited: strconv.Itoa(v.User.Profile.TotalFavorited),
+				WorkCount:      v.User.Profile.WorkCount,
+				FavoriteCount:  v.User.Profile.FavoriteCount,
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, Response{
+		StatusCode: 0,
+		StatusMsg:  "Success",
+		VideoList:  videoResList,
+	})
 }

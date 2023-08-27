@@ -20,6 +20,7 @@ func main() {
 	r.GET("/douyin/user/", middleware.Authentication(), user.GetUser)
 	r.POST("/douyin/user/login/", user.Login)
 	r.GET("/douyin/feed/", video.GetFeed)
+	r.GET("/douyin/publish/list/", middleware.Authentication(), video.GetUserVideos)
 
 	err = r.Run(":8080")
 	if err != nil {
