@@ -8,6 +8,7 @@ import (
 type Video struct {
 	gorm.Model
 	UserID        uint      `gorm:"index:idx_user_created" json:"user_id"`
+	User          User      `gorm:"foreignKey:UserID"`
 	Title         string    `json:"title"`
 	PlayUrl       string    `json:"play_url"`
 	CoverUrl      string    `json:"cover_url"`

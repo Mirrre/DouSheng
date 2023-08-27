@@ -17,6 +17,8 @@ services:
 
   backend:
     build: .
+    volumes:
+      - .:/app
     ports:
       - "8080:8080"
     depends_on:
@@ -26,7 +28,7 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_HOST: db
       MYSQL_PORT: 3306
-    command: ["/app/wait-for-it.sh", "db:3306", "--", "./main"]
+    command: ["/app/wait-for-it.sh", "db:3306", "--", "go", "run", "."]
 
 volumes:
   db_data:
