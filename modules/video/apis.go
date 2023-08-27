@@ -45,8 +45,6 @@ type AuthorRes struct {
 }
 
 func GetFeed(c *gin.Context) {
-	var videos []models.Video
-
 	latestTimeString := c.DefaultQuery("latest_time", "")
 	if latestTimeString == "" {
 		// 将当前时间转换为毫秒单位的Unix时间戳
@@ -65,7 +63,8 @@ func GetFeed(c *gin.Context) {
 
 	// 将毫秒单位的Unix时间戳转换为time.Time对象
 	latestTime := time.Unix(0, unixTimeMs*1e6)
-	fmt.Println("Latest time: ", latestTime)
+
+	var videos []models.Video
 	db := c.MustGet("db").(*gorm.DB)
 	err = db.Preload("User").Preload("User.Profile").
 		Where("publish_time < ?", latestTime).Order("publish_time desc").
@@ -120,8 +119,6 @@ func GetFeed(c *gin.Context) {
 }
 
 func GetUserVideos(c *gin.Context) {
-	var videos []models.Video
-
 	// validate user_id
 	userId := c.DefaultQuery("user_id", "0")
 	if userIdInt, err := strconv.Atoi(userId); err != nil || userIdInt < 1 {
@@ -134,6 +131,8 @@ func GetUserVideos(c *gin.Context) {
 
 	// fetch videos published by user_id
 	db := c.MustGet("db").(*gorm.DB)
+
+	var videos []models.Video
 	err := db.Preload("User").Preload("User.Profile").
 		Where("user_id = ?", userId).Order("publish_time desc").
 		Find(&videos).Error
