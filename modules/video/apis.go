@@ -1,6 +1,7 @@
 package video
 
 import (
+	"app/consts"
 	"app/modules/models"
 	"app/utils"
 	"fmt"
@@ -10,40 +11,6 @@ import (
 	"strconv"
 	"time"
 )
-
-const MaxVideos = 5
-
-type Response struct {
-	StatusCode int            `json:"status_code"`
-	StatusMsg  string         `json:"status_msg"`
-	NextTime   int64          `json:"next_time"`
-	VideoList  []FeedVideoRes `json:"video_list"`
-}
-
-type FeedVideoRes struct {
-	ID            uint      `json:"id"`
-	Author        AuthorRes `json:"author"`
-	PlayUrl       string    `json:"play_url"`
-	CoverUrl      string    `json:"cover_url"`
-	FavoriteCount uint      `json:"favorite_count"`
-	CommentCount  uint      `json:"comment_count"`
-	IsFavorite    bool      `json:"is_favorite"`
-	Title         string    `json:"title"`
-}
-
-type AuthorRes struct {
-	ID             uint   `json:"id"`
-	Name           string `json:"name"`
-	FollowCount    int    `json:"follow_count"`
-	FollowerCount  int    `json:"follower_count"`
-	IsFollow       bool   `json:"is_follow"`
-	Avatar         string `json:"avatar"`
-	Background     string `json:"background_image"`
-	Signature      string `json:"signature"`
-	TotalFavorited string `json:"total_favorited"`
-	WorkCount      int    `json:"work_count"`
-	FavoriteCount  int    `json:"favorite_count"`
-}
 
 // GetFeed 视频流接口，返回早于latest_time发布的MaxVideos个视频
 func GetFeed(c *gin.Context) {
@@ -56,7 +23,7 @@ func GetFeed(c *gin.Context) {
 	// 尝试将输入的字符串解析为毫秒为单位的Unix时间戳
 	unixTimeMs, err := strconv.ParseInt(latestTimeString, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Response{
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Error: Invalid latest_time format. Expected Unix timestamp in milliseconds.",
 		})
@@ -71,9 +38,9 @@ func GetFeed(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	err = db.Preload("User").Preload("User.Profile").
 		Where("publish_time < ?", latestTime).Order("publish_time desc").
-		Limit(MaxVideos).Find(&videos).Error
+		Limit(consts.MaxVideos).Find(&videos).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, Response{
+		c.JSON(http.StatusInternalServerError, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Error: Can't fetch videos.",
 		})
@@ -104,11 +71,11 @@ func GetFeed(c *gin.Context) {
 		}
 	}
 
-	var videoResList []FeedVideoRes
+	var videoResList []utils.VideoResItem
 	for _, v := range videos {
 		// 将查询的数据填充到返回的结构体中
 		_, isLiked := likedVideoIdSet[v.ID]
-		videoResList = append(videoResList, FeedVideoRes{
+		videoResList = append(videoResList, utils.VideoResItem{
 			ID:            v.ID,
 			PlayUrl:       v.PlayUrl,
 			CoverUrl:      v.CoverUrl,
@@ -116,7 +83,7 @@ func GetFeed(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    isLiked,
-			Author: AuthorRes{
+			Author: utils.Author{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
@@ -137,7 +104,7 @@ func GetFeed(c *gin.Context) {
 		nextTime = videos[len(videos)-1].PublishTime.Unix()
 	}
 
-	resp := Response{
+	resp := utils.VideoResponse{
 		StatusCode: 0,
 		StatusMsg:  "Success",
 		NextTime:   nextTime,
@@ -151,7 +118,7 @@ func GetUserVideos(c *gin.Context) {
 	// 验证 user_id
 	userId := c.DefaultQuery("user_id", "0")
 	if userIdInt, err := strconv.Atoi(userId); err != nil || userIdInt < 1 {
-		c.JSON(http.StatusBadRequest, Response{
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Invalid user_id.",
 		})
@@ -166,7 +133,7 @@ func GetUserVideos(c *gin.Context) {
 		Where("user_id = ?", userId).Order("publish_time desc").
 		Find(&videos).Error
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Response{
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Error fetching videos.",
 		})
@@ -191,10 +158,10 @@ func GetUserVideos(c *gin.Context) {
 		likedVideoIdSet[id] = true
 	}
 
-	var videoResList []FeedVideoRes
+	var videoResList []utils.VideoResItem
 	for _, v := range videos {
 		_, isLiked := likedVideoIdSet[v.ID]
-		videoResList = append(videoResList, FeedVideoRes{
+		videoResList = append(videoResList, utils.VideoResItem{
 			ID:            v.ID,
 			PlayUrl:       v.PlayUrl,
 			CoverUrl:      v.CoverUrl,
@@ -202,7 +169,7 @@ func GetUserVideos(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    isLiked,
-			Author: AuthorRes{
+			Author: utils.Author{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
@@ -217,7 +184,7 @@ func GetUserVideos(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusOK, utils.VideoResponse{
 		StatusCode: 0,
 		StatusMsg:  "Success",
 		VideoList:  videoResList,

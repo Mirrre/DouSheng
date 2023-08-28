@@ -2,7 +2,6 @@ package favorite
 
 import (
 	"app/modules/models"
-	"app/modules/video"
 	"app/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -53,15 +52,6 @@ func Action(c *gin.Context) {
 			})
 			return
 		}
-		// Add 1 to video.FavoriteCount
-		if err := db.Model(&models.Video{}).Where("id = ?", videoIdInt).
-			UpdateColumn("favorite_count", gorm.Expr("favorite_count + ?", 1)).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status_code": 1,
-				"status_msg":  "Failed to update video's favorite count",
-			})
-			return
-		}
 	case "2": // Un-favorite
 		// If current user hasn't liked this video, unlike is not allowed
 		var count int64
@@ -73,6 +63,8 @@ func Action(c *gin.Context) {
 			})
 			return
 		}
+		// TODO: Cannot unlike other's like
+
 		// Failed to delete the like record for some reason
 		if err := db.Where("user_id = ? AND video_id = ?", userId, videoIdInt).
 			Delete(&models.Favorite{}).Error; err != nil {
@@ -82,20 +74,11 @@ func Action(c *gin.Context) {
 			})
 			return
 		}
-		// Video.FavoriteCount - 1
-		if err := db.Model(&models.Video{}).Where("id = ?", videoIdInt).
-			UpdateColumn("favorite_count", gorm.Expr("favorite_count - ?", 1)).Error; err != nil { // Note the subtraction here
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status_code": 1,
-				"status_msg":  "Failed to update video's favorite count",
-			})
-			return
-		}
 	default:
 		// If actionType is not 1 nor 2
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status_code": 1,
-			"status_msg":  "Invalid action type",
+			"status_msg":  "Invalid action type.",
 		})
 		return
 	}
@@ -136,9 +119,9 @@ func GetLikeVideos(c *gin.Context) {
 	db.Preload("User").Preload("User.Profile").
 		Where("id IN (?)", videoIds).Find(&videos)
 
-	var videoResList []video.FeedVideoRes
+	var videoResList []utils.VideoResItem
 	for _, v := range videos {
-		videoResList = append(videoResList, video.FeedVideoRes{
+		videoResList = append(videoResList, utils.VideoResItem{
 			ID:            v.ID,
 			PlayUrl:       v.PlayUrl,
 			CoverUrl:      v.CoverUrl,
@@ -146,7 +129,7 @@ func GetLikeVideos(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    true,
-			Author: video.AuthorRes{
+			Author: utils.Author{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
@@ -161,7 +144,7 @@ func GetLikeVideos(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, video.Response{
+	c.JSON(http.StatusOK, utils.VideoResponse{
 		StatusCode: 0,
 		StatusMsg:  "Success",
 		VideoList:  videoResList,
