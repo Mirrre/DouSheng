@@ -2,7 +2,7 @@ package user
 
 import (
 	"app/modules/models"
-	"app/util"
+	"app/utils"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -40,7 +40,7 @@ func Register(c *gin.Context) {
 	}
 
 	// 生成新Token
-	newToken, err := util.GenerateToken(user.ID)
+	newToken, err := utils.GenerateToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
@@ -138,7 +138,7 @@ func Login(c *gin.Context) {
 	}
 
 	// 生成新Token
-	newToken, err := util.GenerateToken(user.ID)
+	newToken, err := utils.GenerateToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,

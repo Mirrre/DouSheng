@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"app/util"
+	"app/utils"
 )
 
 const MaxVideos = 5
@@ -129,7 +129,7 @@ func GetFeed(c *gin.Context) {
 func Submission(c *gin.Context) {
 	tokenString := c.PostForm("token")
 	title := c.PostForm("title")
-	user_id, _ := util.ValidateToken(tokenString)
+	user_id, _ := utils.ValidateToken(tokenString)
 	fmt.Println(title)
 	fmt.Println("user_id:", user_id)
 

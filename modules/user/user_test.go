@@ -3,7 +3,7 @@ package user
 import (
 	"app/config"
 	"app/modules/models"
-	"app/util"
+	"app/utils"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -14,16 +14,16 @@ import (
 
 // Golang的测试会检测到每个包的TestMain函数，首先执行它
 func TestMain(m *testing.M) {
-	util.Setup()
+	utils.Setup()
 	postSetup()
 	code := m.Run()
-	util.Teardown()
+	utils.Teardown()
 	os.Exit(code)
 }
 
 var RegisterUrl = "/douyin/user/register/"
 var LoginUrl = "/douyin/user/login/"
-var db = util.GetDb()
+var db = utils.GetDb()
 
 func postSetup() {
 	// Create 2 users

@@ -2,7 +2,7 @@
 // 在测试之后清除测试数据。
 // 对于每一个包的测试，顺序是 Setup -> 测试 -> Teardown
 
-package util
+package utils
 
 import (
 	"app/config"
