@@ -30,7 +30,14 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 	}
 	// 自动将表单模型结构体迁移成数据库表单
 	err = db.AutoMigrate(&models.User{}, &models.UserProfile{},
-		&models.Video{}, &models.Favorite{}, &models.Comment{})
+		&models.Video{}, &models.Favorite{},
+		&models.Comment{}, &models.Message{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	// 对于 Message 模型进行特殊的迁移以设置复合索引
+	err = models.Message{}.Migrate(db)
 	if err != nil {
 		return nil, err
 	}
