@@ -5,6 +5,7 @@ import (
 	"app/middleware"
 	"app/modules/comment"
 	"app/modules/favorite"
+	"app/modules/message"
 	"app/modules/user"
 	"app/modules/video"
 )
@@ -27,6 +28,7 @@ func main() {
 	r.GET("/douyin/favorite/list/", middleware.Authentication(), favorite.GetLikeVideos)
 	r.POST("/douyin/comment/action/", middleware.Authentication(), comment.Action)
 	r.GET("/douyin/comment/list/", middleware.Authentication(), comment.List)
+	r.POST("/douyin/message/action/", middleware.Authentication(), message.Send)
 
 	err = r.Run(":8080")
 	if err != nil {

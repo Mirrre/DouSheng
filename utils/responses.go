@@ -52,3 +52,17 @@ type CommentResponse struct {
 	StatusMsg  string          `json:"status_msg"`
 	Comment    *CommentResItem `json:"comment,omitempty"`
 }
+
+type MessageHistoryResponse struct {
+	StatusCode  int              `json:"status_code"`
+	StatusMsg   string           `json:"status_msg"`
+	MessageList []MessageResItem `json:"message_list"`
+}
+
+type MessageResItem struct {
+	ID         uint      `json:"id"`
+	ToUserId   uint      `json:"to_user_id"`
+	FromUserId uint      `json:"from_user_id"`
+	Content    string    `json:"content"`
+	CreateTime time.Time `json:"create_time"`
+}
