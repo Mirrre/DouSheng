@@ -137,7 +137,7 @@ func GetLikeVideos(c *gin.Context) {
 				Signature:      v.User.Profile.Signature,
 				FollowCount:    v.User.Profile.FollowCount,
 				FollowerCount:  v.User.Profile.FollowerCount,
-				TotalFavorited: strconv.Itoa(v.User.Profile.TotalFavorited),
+				TotalFavorited: v.User.Profile.TotalFavorited,
 				WorkCount:      v.User.Profile.WorkCount,
 				FavoriteCount:  v.User.Profile.FavoriteCount,
 			},

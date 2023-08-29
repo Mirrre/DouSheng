@@ -4,7 +4,6 @@ import (
 	"app/consts"
 	"app/modules/models"
 	"app/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"net/http"
@@ -26,7 +25,6 @@ func Action(c *gin.Context) {
 
 	db := c.MustGet("db").(*gorm.DB)
 	var user models.User
-	fmt.Println("token user id: ", userId)
 	if err := db.Preload("Profile").First(&user, userId).Error; err != nil {
 		c.JSON(http.StatusBadRequest, utils.CommentResponse{
 			StatusCode: 1,
@@ -42,6 +40,15 @@ func Action(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, utils.CommentResponse{
 			StatusCode: 1,
 			StatusMsg:  "Invalid Video ID.",
+		})
+		return
+	}
+	// 验证视频是否存在
+	var video models.Video
+	if err := db.First(&video, videoId).Error; err != nil {
+		c.JSON(http.StatusNotFound, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Video not found.",
 		})
 		return
 	}
@@ -88,9 +95,9 @@ func Action(c *gin.Context) {
 			Avatar:         user.Profile.Avatar,
 			Background:     user.Profile.Background,
 			Signature:      user.Profile.Signature,
-			TotalFavorited: strconv.Itoa(user.Profile.TotalFavorited), // TODO: update this value after like/unlike
-			WorkCount:      user.Profile.WorkCount,                    // TODO: update this value after video submission
-			FavoriteCount:  user.Profile.FavoriteCount,                // TODO: update this value after like/unlike
+			TotalFavorited: user.Profile.TotalFavorited, // TODO: update this value after like/unlike
+			WorkCount:      user.Profile.WorkCount,      // TODO: update this value after video submission
+			FavoriteCount:  user.Profile.FavoriteCount,  // TODO: update this value after like/unlike
 		}
 		c.JSON(http.StatusOK, utils.CommentResponse{
 			StatusCode: 0,
@@ -144,5 +151,68 @@ func Action(c *gin.Context) {
 		})
 		return
 	}
+}
 
+func List(c *gin.Context) {
+	// 验证video_id
+	videoId := c.DefaultQuery("video_id", "0")
+	videoIdInt, err := strconv.Atoi(videoId)
+	if err != nil || videoIdInt < 1 {
+		c.JSON(http.StatusBadRequest, utils.CommentListResponse{
+			StatusCode: 1,
+			StatusMsg:  "Invalid Video ID.",
+		})
+		return
+	}
+
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 验证视频是否存在
+	var video models.Video
+	if err := db.First(&video, videoId).Error; err != nil {
+		c.JSON(http.StatusNotFound, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Video not found.",
+		})
+		return
+	}
+
+	var commentList []models.Comment
+	result := db.Preload("User").Where("video_id = ?", videoId).
+		Find(&commentList).Order("created_at desc")
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, utils.CommentListResponse{
+			StatusCode: 1,
+			StatusMsg:  "Failed to fetch comments",
+		})
+		return
+	}
+
+	var commentListResponses []utils.CommentResItem
+	for _, comment := range commentList {
+		commentListResponses = append(commentListResponses, utils.CommentResItem{
+			ID: comment.ID,
+			User: utils.Author{
+				ID:   comment.User.ID,
+				Name: comment.User.Username,
+				// TODO: in relation
+				//FollowCount:    0,
+				//FollowerCount:  0,
+				//IsFollow:       false,
+				Avatar:         comment.User.Profile.Avatar,
+				Background:     comment.User.Profile.Background,
+				Signature:      comment.User.Profile.Signature,
+				TotalFavorited: comment.User.Profile.TotalFavorited,
+				WorkCount:      comment.User.Profile.WorkCount,
+				FavoriteCount:  comment.User.Profile.FavoriteCount,
+			},
+			Content:    comment.Content,
+			CreateDate: comment.CreatedAt,
+		})
+	}
+	c.JSON(http.StatusOK, utils.CommentListResponse{
+		StatusCode:  0,
+		StatusMsg:   "Success",
+		CommentList: &commentListResponses,
+	})
 }

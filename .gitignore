@@ -7,3 +7,5 @@ node_modules
 .idea/
 *.jpg
 *.mp4
+db_data/
+minio_data/

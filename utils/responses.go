@@ -29,15 +29,15 @@ type Author struct {
 	Avatar         string `json:"avatar"`
 	Background     string `json:"background_image"`
 	Signature      string `json:"signature"`
-	TotalFavorited string `json:"total_favorited"`
+	TotalFavorited int    `json:"total_favorited"`
 	WorkCount      int    `json:"work_count"`
 	FavoriteCount  int    `json:"favorite_count"`
 }
 
 type CommentListResponse struct {
-	StatusCode  int              `json:"status_code"`
-	StatusMsg   string           `json:"status_msg"`
-	CommentList []CommentResItem `json:"comment_list"`
+	StatusCode  int               `json:"status_code"`
+	StatusMsg   string            `json:"status_msg"`
+	CommentList *[]CommentResItem `json:"comment_list"`
 }
 
 type CommentResItem struct {

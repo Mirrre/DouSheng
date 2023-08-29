@@ -26,6 +26,7 @@ func main() {
 	r.POST("/douyin/favorite/action/", middleware.Authentication(), favorite.Action)
 	r.GET("/douyin/favorite/list/", middleware.Authentication(), favorite.GetLikeVideos)
 	r.POST("/douyin/comment/action/", middleware.Authentication(), comment.Action)
+	r.GET("/douyin/comment/list/", middleware.Authentication(), comment.List)
 
 	err = r.Run(":8080")
 	if err != nil {
