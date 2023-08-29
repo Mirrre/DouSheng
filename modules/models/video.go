@@ -12,7 +12,7 @@ type Video struct {
 	Title         string    `json:"title"`
 	PlayUrl       string    `json:"play_url"`
 	CoverUrl      string    `json:"cover_url"`
-	FavoriteCount uint      `json:"favorite_count"`
-	CommentCount  uint      `json:"comment_count"`
+	FavoriteCount uint      `gorm:"default:0;not null" json:"favorite_count"`
+	CommentCount  uint      `gorm:"default:0;not null" json:"comment_count"`
 	PublishTime   time.Time `gorm:"index:idx_publish_time;index:idx_user_created" json:"published_at"`
 }
