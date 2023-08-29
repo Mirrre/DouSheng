@@ -162,6 +162,7 @@ func GetUserVideos(c *gin.Context) {
 
 	// 获取用户的投稿列表
 	var videos []models.Video
+
 	err := db.Preload("User").Preload("User.Profile").
 		Where("user_id = ?", userId).Order("publish_time desc").
 		Find(&videos).Error
@@ -201,7 +202,6 @@ func GetUserVideos(c *gin.Context) {
 			FavoriteCount: v.FavoriteCount,
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
-			IsFavorite:    isLiked,
 			Author: AuthorRes{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
