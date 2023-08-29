@@ -2,6 +2,7 @@ package favorite
 
 import (
 	"app/modules/models"
+	"app/modules/video"
 	"app/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -74,6 +75,7 @@ func Action(c *gin.Context) {
 			})
 			return
 		}
+
 	default:
 		// If actionType is not 1 nor 2
 		c.JSON(http.StatusBadRequest, gin.H{

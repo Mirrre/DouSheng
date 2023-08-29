@@ -32,8 +32,8 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 	// TODO: Can we automatically input db models here?
 	err = db.AutoMigrate(
 		&models.User{}, &models.UserProfile{}, &models.Video{},
-		&models.Favorite{}, &models.Comment{},
-	)
+		&models.F
+	err = db.AutoMigrate(&models.User{}, &models.UserProfile{}, &models.Video{}, &models.Favorite{})
 	if err != nil {
 		return nil, err
 	}
