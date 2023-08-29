@@ -8,7 +8,7 @@ import (
 
 var jwtKey = []byte("a_secret_key") // TODO: how to make the secret key more secure?
 
-// 生成新Token，参考：https://golang-jwt.github.io/jwt/usage/create/
+// GenerateToken 生成新Token，参考：https://golang-jwt.github.io/jwt/usage/create/
 func GenerateToken(userID uint) (string, error) {
 	// 自定义Token的声明，声明可以理解为一个JSON数据包，包含了我们想要封装在Token里面的信息
 	claims := jwt.MapClaims{
@@ -29,7 +29,7 @@ func GenerateToken(userID uint) (string, error) {
 	return signedToken, nil
 }
 
-// 解析和验证Token
+// ValidateToken 解析和验证Token
 func ValidateToken(signedToken string) (uint, error) {
 	// 定义一个空的MapClaims，用来保存我们Token中的声明（claims）
 	claims := &jwt.MapClaims{}

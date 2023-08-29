@@ -1,7 +1,9 @@
 package video
 
 import (
+	"app/consts"
 	"app/modules/models"
+	"app/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
@@ -12,47 +14,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-
-	"app/utils"
 )
 
-const MaxVideos = 5
-
-type FeedResponse struct {
-	StatusCode int            `json:"status_code"`
-	StatusMsg  string         `json:"status_msg"`
-	NextTime   int64          `json:"next_time"`
-	VideoList  []FeedVideoRes `json:"video_list"`
-}
-
-type FeedVideoRes struct {
-	ID            uint      `json:"id"`
-	Author        AuthorRes `json:"author"`
-	PlayUrl       string    `json:"play_url"`
-	CoverUrl      string    `json:"cover_url"`
-	FavoriteCount uint      `json:"favorite_count"`
-	CommentCount  uint      `json:"comment_count"`
-	IsFavorite    bool      `json:"is_favorite"`
-	Title         string    `json:"title"`
-}
-
-type AuthorRes struct {
-	ID             uint   `json:"id"`
-	Name           string `json:"name"`
-	FollowCount    int    `json:"follow_count"`
-	FollowerCount  int    `json:"follower_count"`
-	IsFollow       bool   `json:"is_follow"`
-	Avatar         string `json:"avatar"`
-	Background     string `json:"background_image"`
-	Signature      string `json:"signature"`
-	TotalFavorited string `json:"total_favorited"`
-	WorkCount      int    `json:"work_count"`
-	FavoriteCount  int    `json:"favorite_count"`
-}
-
+// GetFeed 视频流接口，返回早于latest_time发布的MaxVideos个视频
 func GetFeed(c *gin.Context) {
-	var videos []models.Video
-
 	latestTimeString := c.DefaultQuery("latest_time", "")
 	if latestTimeString == "" {
 		// 将当前时间转换为毫秒单位的Unix时间戳
@@ -62,7 +27,7 @@ func GetFeed(c *gin.Context) {
 	// 尝试将输入的字符串解析为毫秒为单位的Unix时间戳
 	unixTimeMs, err := strconv.ParseInt(latestTimeString, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, FeedResponse{
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Error: Invalid latest_time format. Expected Unix timestamp in milliseconds.",
 		})
@@ -71,31 +36,58 @@ func GetFeed(c *gin.Context) {
 
 	// 将毫秒单位的Unix时间戳转换为time.Time对象
 	latestTime := time.Unix(0, unixTimeMs*1e6)
-	fmt.Println("Latest time: ", latestTime)
+
+	// 找出所有发布时间早于latestTime的视频
+	var videos []models.Video
 	db := c.MustGet("db").(*gorm.DB)
 	err = db.Preload("User").Preload("User.Profile").
 		Where("publish_time < ?", latestTime).Order("publish_time desc").
-		Limit(10).Find(&videos).Error
+		Limit(consts.MaxVideos).Find(&videos).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, FeedResponse{
+		c.JSON(http.StatusInternalServerError, utils.VideoResponse{
 			StatusCode: 1,
 			StatusMsg:  "Error: Can't fetch videos.",
 		})
 		return
 	}
 
-	var videoResList []FeedVideoRes
+	// 检查当前登录状态
+	tokenString := c.DefaultQuery("token", "")
+	userId, _ := utils.ValidateToken(tokenString)
+	isLoggedIn := userId > 0
+
+	// 如果当前已登录，我们需要知道返回的MaxVideos个视频中哪些被用户已经点赞过
+	var likedVideoIdSet = make(map[uint]bool)
+	if isLoggedIn == true {
+		// 生成视频ID列表
+		var videoIds []uint
+		for _, video := range videos {
+			videoIds = append(videoIds, video.ID)
+		}
+		// 查询favorites表，看看哪些视频被用户点赞过
+		var likedVideoIds []uint
+		db.Table("favorites").
+			Where("user_id = ? AND video_id in (?)\n", userId, videoIds).
+			Pluck("video_id", &likedVideoIds)
+
+		for _, id := range likedVideoIds {
+			likedVideoIdSet[id] = true
+		}
+	}
+
+	var videoResList []utils.VideoResItem
 	for _, v := range videos {
 		// 将查询的数据填充到返回的结构体中
-		videoResList = append(videoResList, FeedVideoRes{
-			ID:      v.ID,
-			PlayUrl: v.PlayUrl,
-			// "sdcard/DCIM/Camera/TG-2023-05-22-1541367851684741298128.mp4"
+		_, isLiked := likedVideoIdSet[v.ID]
+		videoResList = append(videoResList, utils.VideoResItem{
+			ID:            v.ID,
+			PlayUrl:       v.PlayUrl,
 			CoverUrl:      v.CoverUrl,
 			FavoriteCount: v.FavoriteCount,
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
-			Author: AuthorRes{
+			IsFavorite:    isLiked,
+			Author: utils.Author{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
@@ -103,7 +95,7 @@ func GetFeed(c *gin.Context) {
 				Signature:      v.User.Profile.Signature,
 				FollowCount:    v.User.Profile.FollowCount,
 				FollowerCount:  v.User.Profile.FollowerCount,
-				TotalFavorited: strconv.Itoa(v.User.Profile.TotalFavorited),
+				TotalFavorited: v.User.Profile.TotalFavorited,
 				WorkCount:      v.User.Profile.WorkCount,
 				FavoriteCount:  v.User.Profile.FavoriteCount,
 			},
@@ -116,7 +108,7 @@ func GetFeed(c *gin.Context) {
 		nextTime = videos[len(videos)-1].PublishTime.Unix()
 	}
 
-	resp := FeedResponse{
+	resp := utils.VideoResponse{
 		StatusCode: 0,
 		StatusMsg:  "Success",
 		NextTime:   nextTime,
@@ -129,9 +121,9 @@ func GetFeed(c *gin.Context) {
 func Submission(c *gin.Context) {
 	tokenString := c.PostForm("token")
 	title := c.PostForm("title")
-	user_id, _ := utils.ValidateToken(tokenString)
+	userId, _ := utils.ValidateToken(tokenString)
 	fmt.Println(title)
-	fmt.Println("user_id:", user_id)
+	fmt.Println("user_id:", userId)
 
 	// 获取上传的视频文件
 	videoFile, err := c.FormFile("data")
@@ -145,7 +137,14 @@ func Submission(c *gin.Context) {
 	}
 	// 创建视频存储路径
 	storagePath := filepath.Join("temp", "videos")
-	os.MkdirAll(storagePath, os.ModePerm)
+	if err := os.MkdirAll(storagePath, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to create video path",
+		})
+		fmt.Println("无法创建视频存储路径")
+		return
+	}
 
 	// 保存视频至本地
 	videoFilePath := filepath.Join(storagePath, videoFile.Filename)
@@ -196,7 +195,7 @@ func Submission(c *gin.Context) {
 	}
 
 	// 上传视频至Minio
-	objectName := fmt.Sprintf("%d/%s.mp4", user_id, title)
+	objectName := fmt.Sprintf("%d/%s.mp4", userId, title)
 	n, err := minioClient.FPutObject(c.Request.Context(), bucketName, objectName, videoFilePath, minio.PutObjectOptions{
 		ContentType: "video/mp4",
 	})
@@ -235,7 +234,7 @@ func Submission(c *gin.Context) {
 	coverUrl := presignedURL.String()
 	// 在数据库中创建新的视频记录
 	newVideo := models.Video{
-		UserID:      user_id,
+		UserID:      userId,
 		Title:       title,
 		PlayUrl:     playUrl,
 		CoverUrl:    coverUrl,
@@ -248,5 +247,82 @@ func Submission(c *gin.Context) {
 		"status_code": 0,
 		"status_msg":  "video upload uccess",
 	})
+}
 
+func GetUserVideos(c *gin.Context) {
+	// 验证 user_id
+	userId := c.DefaultQuery("user_id", "0")
+	if userIdInt, err := strconv.Atoi(userId); err != nil || userIdInt < 1 {
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
+			StatusCode: 1,
+			StatusMsg:  "Invalid user_id.",
+		})
+		return
+	}
+
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 获取用户的投稿列表
+	var videos []models.Video
+
+	err := db.Preload("User").Preload("User.Profile").
+		Where("user_id = ?", userId).Order("publish_time desc").
+		Find(&videos).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.VideoResponse{
+			StatusCode: 1,
+			StatusMsg:  "Error fetching videos.",
+		})
+		return
+	}
+
+	// 获取投稿视频的ID列表
+	var videoIds []uint
+	for _, v := range videos {
+		videoIds = append(videoIds, v.ID)
+	}
+
+	// 在这些视频ID中，查询哪些被自己点赞过
+	var likedVideoIds []uint
+	db.Table("favorites").
+		Where("user_id = ? AND video_id IN (?)", userId, videoIds).
+		Pluck("video_id", &likedVideoIds)
+
+	// 将这些ID放进哈希表，以便在O(1)时间内查询某个视频是否被自己点赞过
+	var likedVideoIdSet = make(map[uint]bool)
+	for _, id := range likedVideoIds {
+		likedVideoIdSet[id] = true
+	}
+
+	var videoResList []utils.VideoResItem
+	for _, v := range videos {
+		_, isLiked := likedVideoIdSet[v.ID]
+		videoResList = append(videoResList, utils.VideoResItem{
+			ID:            v.ID,
+			PlayUrl:       v.PlayUrl,
+			CoverUrl:      v.CoverUrl,
+			FavoriteCount: v.FavoriteCount,
+			CommentCount:  v.CommentCount,
+			Title:         v.Title,
+			IsFavorite:    isLiked,
+			Author: utils.Author{
+				ID:             v.User.ID,
+				Name:           v.User.Username,
+				Avatar:         v.User.Profile.Avatar,
+				Background:     v.User.Profile.Background,
+				Signature:      v.User.Profile.Signature,
+				FollowCount:    v.User.Profile.FollowCount,
+				FollowerCount:  v.User.Profile.FollowerCount,
+				TotalFavorited: v.User.Profile.TotalFavorited,
+				WorkCount:      v.User.Profile.WorkCount,
+				FavoriteCount:  v.User.Profile.FavoriteCount,
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, utils.VideoResponse{
+		StatusCode: 0,
+		StatusMsg:  "Success",
+		VideoList:  videoResList,
+	})
 }
