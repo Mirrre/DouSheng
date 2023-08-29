@@ -36,11 +36,6 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 对于 Message 模型进行特殊的迁移以设置复合索引
-	err = models.Message{}.Migrate(db)
-	if err != nil {
-		return nil, err
-	}
 	return db, nil
 }
 
