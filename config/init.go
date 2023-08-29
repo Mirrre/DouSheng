@@ -30,6 +30,9 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 	}
 	// 自动将表单模型结构体迁移成数据库表单
 	// TODO: Can we automatically input db models here?
+	err = db.AutoMigrate(
+		&models.User{}, &models.UserProfile{}, &models.Video{},
+		&models.F
 	err = db.AutoMigrate(&models.User{}, &models.UserProfile{}, &models.Video{}, &models.Favorite{})
 	if err != nil {
 		return nil, err

@@ -3,6 +3,7 @@ package main
 import (
 	"app/config"
 	"app/middleware"
+	"app/modules/comment"
 	"app/modules/favorite"
 	"app/modules/user"
 	"app/modules/video"
@@ -24,6 +25,8 @@ func main() {
 	r.GET("/douyin/publish/list/", middleware.Authentication(), video.GetUserVideos)
 	r.POST("/douyin/favorite/action/", middleware.Authentication(), favorite.Action)
 	r.GET("/douyin/favorite/list/", middleware.Authentication(), favorite.GetLikeVideos)
+	r.POST("/douyin/comment/action/", middleware.Authentication(), comment.Action)
+	r.GET("/douyin/comment/list/", middleware.Authentication(), comment.List)
 
 	err = r.Run(":8080")
 	if err != nil {
