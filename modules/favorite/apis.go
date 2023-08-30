@@ -2,7 +2,6 @@ package favorite
 
 import (
 	"app/modules/models"
-	"app/modules/video"
 	"app/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
