@@ -113,3 +113,55 @@ func Action(c *gin.Context) {
 	})
 	return
 }
+
+// GetFollowings 查询关注列表
+func GetFollowings(c *gin.Context) {
+	// 获取 user_id 参数
+	userIdString := c.DefaultQuery("user_id", "")
+	// 验证 user_id
+	userIdInt, err := strconv.Atoi(userIdString)
+	if err != nil || userIdInt <= 0 {
+		c.JSON(http.StatusBadRequest, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Invalid target user ID.",
+		})
+		return
+	}
+
+	// 查找用户的关注列表
+	var relationships []models.Relation
+	db := c.MustGet("db").(*gorm.DB)
+	if err := db.Preload("ToUser").Preload("ToUser.Profile").
+		Where("from_user_id = ?", userIdString).
+		Find(&relationships).Error; err != nil { // 如果查询失败
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to fetch followings.",
+		})
+		return
+	}
+
+	// 生成 user_list
+	var userList []utils.UserResponse
+	for _, relation := range relationships {
+		userList = append(userList, utils.UserResponse{
+			ID:             relation.ToUser.ID,
+			Name:           relation.ToUser.Username,
+			FollowCount:    relation.ToUser.Profile.FollowCount,
+			FollowerCount:  relation.ToUser.Profile.FollowerCount,
+			IsFollow:       true,
+			Avatar:         relation.ToUser.Profile.Avatar,
+			Background:     relation.ToUser.Profile.Background,
+			Signature:      relation.ToUser.Profile.Signature,
+			TotalFavorited: relation.ToUser.Profile.TotalFavorited,
+			WorkCount:      relation.ToUser.Profile.WorkCount,
+			FavoriteCount:  relation.ToUser.Profile.FavoriteCount,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code": 1,
+		"status_msg":  "Success",
+		"user_list":   userList,
+	})
+}
