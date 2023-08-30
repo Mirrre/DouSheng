@@ -82,7 +82,10 @@ func Action(c *gin.Context) {
 			return
 		}
 	case "2": // 取关
-		var relationToDelete models.Relation
+		relationToDelete := models.Relation{
+			FromUserId: fromUserId,
+			ToUserId:   uint(toUserIdInt),
+		}
 		tx := db.Where("from_user_id = ? and to_user_id = ?", fromUserId, toUserIdString).
 			Delete(&relationToDelete)
 		if tx.RowsAffected == 0 { // 删除了0条记录，说明这条关注关系不存在

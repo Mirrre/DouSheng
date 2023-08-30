@@ -77,10 +77,18 @@ func GetUser(c *gin.Context) {
 		return
 	}
 
+	// 查看当前登录用户是否关注目标用户
+	var relation models.Relation
+	tokenString := c.DefaultQuery("token", "")
+	currentUserId, _ := utils.ValidateToken(tokenString)
+	result := db.Where("from_user_id = ? AND to_user_id = ?", currentUserId, id).First(&relation)
+	isFollowed := result.RowsAffected > 0
+
 	userResponse := map[string]interface{}{
 		"id":               user.ID,
 		"name":             user.Username,
 		"follow_count":     user.Profile.FollowCount,
+		"is_follow":        isFollowed,
 		"avatar":           user.Profile.Avatar,
 		"background_image": user.Profile.Background,
 		"signature":        user.Profile.Signature,
