@@ -90,14 +90,17 @@ func Action(c *gin.Context) {
 		}
 
 		author := utils.UserResponse{
-			ID:             user.ID,
-			Name:           user.Username,
+			ID:            user.ID,
+			Name:          user.Username,
+			FollowCount:   user.Profile.FollowCount,
+			FollowerCount: user.Profile.FollowerCount,
+			// TODO: IsFollow
 			Avatar:         user.Profile.Avatar,
 			Background:     user.Profile.Background,
 			Signature:      user.Profile.Signature,
-			TotalFavorited: user.Profile.TotalFavorited, // TODO: update this value after like/unlike
-			WorkCount:      user.Profile.WorkCount,      // TODO: update this value after video submission
-			FavoriteCount:  user.Profile.FavoriteCount,  // TODO: update this value after like/unlike
+			TotalFavorited: user.Profile.TotalFavorited,
+			WorkCount:      user.Profile.WorkCount,
+			FavoriteCount:  user.Profile.FavoriteCount,
 		}
 		c.JSON(http.StatusOK, utils.CommentResponse{
 			StatusCode: 0,
@@ -109,6 +112,7 @@ func Action(c *gin.Context) {
 				CreateDate: comment.CreatedAt,
 			},
 		})
+		return
 	case "2": // 删除评论
 		commentId := c.DefaultQuery("comment_id", "")
 		// 验证comment_id
@@ -151,6 +155,10 @@ func Action(c *gin.Context) {
 		})
 		return
 	}
+	c.JSON(http.StatusOK, utils.CommentResponse{
+		StatusCode: 0,
+		StatusMsg:  "Successfully deleted comment.",
+	})
 }
 
 func List(c *gin.Context) {
@@ -193,11 +201,10 @@ func List(c *gin.Context) {
 		commentListResponses = append(commentListResponses, utils.CommentResItem{
 			ID: comment.ID,
 			User: utils.UserResponse{
-				ID:   comment.User.ID,
-				Name: comment.User.Username,
-				// TODO: in relation
-				//FollowCount:    0,
-				//FollowerCount:  0,
+				ID:            comment.User.ID,
+				Name:          comment.User.Username,
+				FollowCount:   comment.User.Profile.FollowCount,
+				FollowerCount: comment.User.Profile.FollowerCount,
 				//IsFollow:       false,
 				Avatar:         comment.User.Profile.Avatar,
 				Background:     comment.User.Profile.Background,

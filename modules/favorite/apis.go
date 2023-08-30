@@ -53,7 +53,7 @@ func Action(c *gin.Context) {
 			return
 		}
 	case "2": // Un-favorite
-		// If current user hasn't liked this video, unlike is not allowed
+		// If current user hasn't liked this video, unlike is not allowed. TODO: any better method?
 		var count int64
 		db.Model(&models.Favorite{}).Where("user_id = ? AND video_id = ?", userId, videoIdInt).Count(&count)
 		if count == 0 {
@@ -65,16 +65,18 @@ func Action(c *gin.Context) {
 		}
 		// TODO: Cannot unlike other's like
 
-		// Failed to delete the like record for some reason
+		favoriteToDelete := models.Favorite{
+			UserID:  userId,
+			VideoID: uint(videoIdInt),
+		}
 		if err := db.Where("user_id = ? AND video_id = ?", userId, videoIdInt).
-			Delete(&models.Favorite{}).Error; err != nil {
+			Delete(&favoriteToDelete).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status_code": 1,
 				"status_msg":  "Failed to un-favorite",
 			})
 			return
 		}
-
 	default:
 		// If actionType is not 1 nor 2
 		c.JSON(http.StatusBadRequest, gin.H{
