@@ -32,6 +32,7 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 	err = db.AutoMigrate(&models.User{}, &models.UserProfile{},
 		&models.Video{}, &models.Favorite{},
 		&models.Comment{}, &models.Message{},
+		&models.Relation{},
 	)
 	if err != nil {
 		return nil, err

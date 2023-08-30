@@ -6,6 +6,7 @@ import (
 	"app/modules/comment"
 	"app/modules/favorite"
 	"app/modules/message"
+	"app/modules/relation"
 	"app/modules/user"
 	"app/modules/video"
 )
@@ -30,6 +31,7 @@ func main() {
 	r.GET("/douyin/comment/list/", middleware.Authentication(), comment.List)
 	r.POST("/douyin/message/action/", middleware.Authentication(), message.Send)
 	r.GET("/douyin/message/chat/", middleware.Authentication(), message.GetHistory)
+	r.POST("/douyin/relation/action/", middleware.Authentication(), relation.Action)
 
 	err = r.Run(":8080")
 	if err != nil {
