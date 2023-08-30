@@ -89,7 +89,7 @@ func Action(c *gin.Context) {
 			return
 		}
 
-		author := utils.Author{
+		author := utils.UserResponse{
 			ID:             user.ID,
 			Name:           user.Username,
 			Avatar:         user.Profile.Avatar,
@@ -192,7 +192,7 @@ func List(c *gin.Context) {
 	for _, comment := range commentList {
 		commentListResponses = append(commentListResponses, utils.CommentResItem{
 			ID: comment.ID,
-			User: utils.Author{
+			User: utils.UserResponse{
 				ID:   comment.User.ID,
 				Name: comment.User.Username,
 				// TODO: in relation
