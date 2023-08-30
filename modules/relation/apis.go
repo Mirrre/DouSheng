@@ -229,7 +229,90 @@ func GetFollowers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status_code": 1,
+		"status_code": 0,
+		"status_msg":  "Success",
+		"user_list":   userList,
+	})
+}
+
+func GetFriends(c *gin.Context) {
+	// 获取 user_id 参数
+	userIdString := c.DefaultQuery("user_id", "")
+	// 验证 user_id
+	userIdInt, err := strconv.Atoi(userIdString)
+	if err != nil || userIdInt <= 0 {
+		c.JSON(http.StatusBadRequest, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Invalid target user ID.",
+		})
+		return
+	}
+
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 获取 user_id 的关注列表
+	var followingIds []uint
+	if err := db.Table("relations").Select("to_user_id").
+		Where("from_user_id = ?", userIdString).
+		Pluck("to_user_id", &followingIds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Failed to fetch data.",
+		})
+		return
+	}
+
+	// 如果用户的关注列表为空，那么他肯定没有好友
+	if len(followingIds) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status_code": 0,
+			"status_msg":  "Success",
+			"user_list":   followingIds,
+		})
+		return
+	}
+
+	// 查询 followingIds 中有哪些人关注了 user_id
+	var friends []models.Relation
+	if tx := db.Preload("ToUser").Preload("ToUser.Profile").
+		Where("to_user_id = ? AND from_user_id IN (?)", userIdString, followingIds).
+		Find(&friends); tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Failed to fetch data.",
+		})
+		return
+	}
+
+	if len(friends) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status_code": 0,
+			"status_msg":  "Success",
+			"user_list":   friends,
+		})
+		return
+	}
+
+	// 生成 user_list
+	var userList []utils.UserResponse
+	for _, friend := range friends {
+		userList = append(userList, utils.UserResponse{
+			ID:             friend.ToUser.ID,
+			Name:           friend.ToUser.Username,
+			FollowCount:    friend.ToUser.Profile.FollowCount,
+			FollowerCount:  friend.ToUser.Profile.FollowerCount,
+			IsFollow:       true,
+			Avatar:         friend.ToUser.Profile.Avatar,
+			Background:     friend.ToUser.Profile.Background,
+			Signature:      friend.ToUser.Profile.Signature,
+			TotalFavorited: friend.ToUser.Profile.TotalFavorited,
+			WorkCount:      friend.ToUser.Profile.WorkCount,
+			FavoriteCount:  friend.ToUser.Profile.FavoriteCount,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code": 0,
 		"status_msg":  "Success",
 		"user_list":   userList,
 	})
