@@ -165,3 +165,72 @@ func GetFollowings(c *gin.Context) {
 		"user_list":   userList,
 	})
 }
+
+// GetFollowers 查询粉丝列表
+func GetFollowers(c *gin.Context) {
+	// 获取 user_id 参数
+	userIdString := c.DefaultQuery("user_id", "")
+	// 验证 user_id
+	userIdInt, err := strconv.Atoi(userIdString)
+	if err != nil || userIdInt <= 0 {
+		c.JSON(http.StatusBadRequest, utils.CommentResponse{
+			StatusCode: 1,
+			StatusMsg:  "Invalid target user ID.",
+		})
+		return
+	}
+
+	// 查找用户的粉丝列表
+	var relationships []models.Relation
+	db := c.MustGet("db").(*gorm.DB)
+	if err := db.Preload("FromUser").Preload("FromUser.Profile").
+		Where("to_user_id = ?", userIdString).
+		Find(&relationships).Error; err != nil { // 如果查询失败
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to fetch followers.",
+		})
+		return
+	}
+
+	// 查询当前用户关注了哪些他的粉丝
+	var followerIds []uint // 先将粉丝ID放进一个列表，用来传给数据库查询的 IN 操作
+	for _, relation := range relationships {
+		followerIds = append(followerIds, relation.FromUserId)
+	}
+	// userFollowedFansIds 将查询结果放入这个列表
+	var userFollowedFansIds []uint
+	db.Table("relations").
+		Where("from_user_id = ? AND to_user_id IN (?)", userIdString, followerIds).
+		Pluck("to_user_id", &userFollowedFansIds)
+	// 将 userFollowedFansIds 放入 userFollowedFansSet 哈希表以便在 O(1) 时间内查询
+	var userFollowedFansSet = make(map[uint]bool)
+	for _, id := range userFollowedFansIds {
+		userFollowedFansSet[id] = true
+	}
+
+	// 生成 user_list
+	var userList []utils.UserResponse
+	for _, relation := range relationships {
+		_, isFollowed := userFollowedFansSet[relation.FromUserId]
+		userList = append(userList, utils.UserResponse{
+			ID:             relation.FromUser.ID,
+			Name:           relation.FromUser.Username,
+			FollowCount:    relation.FromUser.Profile.FollowCount,
+			FollowerCount:  relation.FromUser.Profile.FollowerCount,
+			IsFollow:       isFollowed,
+			Avatar:         relation.FromUser.Profile.Avatar,
+			Background:     relation.FromUser.Profile.Background,
+			Signature:      relation.FromUser.Profile.Signature,
+			TotalFavorited: relation.FromUser.Profile.TotalFavorited,
+			WorkCount:      relation.FromUser.Profile.WorkCount,
+			FavoriteCount:  relation.FromUser.Profile.FavoriteCount,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code": 1,
+		"status_msg":  "Success",
+		"user_list":   userList,
+	})
+}

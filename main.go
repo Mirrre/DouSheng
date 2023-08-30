@@ -33,6 +33,7 @@ func main() {
 	r.GET("/douyin/message/chat/", middleware.Authentication(), message.GetHistory)
 	r.POST("/douyin/relation/action/", middleware.Authentication(), relation.Action)
 	r.GET("/douyin/relation/friend/list/", middleware.Authentication(), relation.GetFollowings)
+	r.GET("/douyin/relation/follower/list/", middleware.Authentication(), relation.GetFollowers)
 
 	err = r.Run(":8080")
 	if err != nil {

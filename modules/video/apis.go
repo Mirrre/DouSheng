@@ -63,7 +63,7 @@ func GetFeed(c *gin.Context) {
 		// 查询favorites表，看看哪些视频被用户点赞过
 		var likedVideoIds []uint
 		db.Table("favorites").
-			Where("user_id = ? AND video_id in (?)\n", userId, videoIds).
+			Where("user_id = ? AND video_id in (?)\n", userId, videoIds). // TODO: \n???
 			Pluck("video_id", &likedVideoIds)
 
 		for _, id := range likedVideoIds {
