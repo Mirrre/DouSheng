@@ -29,6 +29,7 @@ func main() {
 	r.POST("/douyin/comment/action/", middleware.Authentication(), comment.Action)
 	r.GET("/douyin/comment/list/", middleware.Authentication(), comment.List)
 	r.POST("/douyin/message/action/", middleware.Authentication(), message.Send)
+	r.GET("/douyin/message/chat/", middleware.Authentication(), message.GetHistory)
 
 	err = r.Run(":8080")
 	if err != nil {
