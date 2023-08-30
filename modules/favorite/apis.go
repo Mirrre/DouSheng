@@ -130,7 +130,7 @@ func GetLikeVideos(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    true,
-			Author: utils.Author{
+			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,

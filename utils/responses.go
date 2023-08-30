@@ -10,17 +10,17 @@ type VideoResponse struct {
 }
 
 type VideoResItem struct {
-	ID            uint   `json:"id"`
-	Author        Author `json:"author"`
-	PlayUrl       string `json:"play_url"`
-	CoverUrl      string `json:"cover_url"`
-	FavoriteCount uint   `json:"favorite_count"`
-	CommentCount  uint   `json:"comment_count"`
-	IsFavorite    bool   `json:"is_favorite"`
-	Title         string `json:"title"`
+	ID            uint         `json:"id"`
+	Author        UserResponse `json:"author"`
+	PlayUrl       string       `json:"play_url"`
+	CoverUrl      string       `json:"cover_url"`
+	FavoriteCount uint         `json:"favorite_count"`
+	CommentCount  uint         `json:"comment_count"`
+	IsFavorite    bool         `json:"is_favorite"`
+	Title         string       `json:"title"`
 }
 
-type Author struct {
+type UserResponse struct {
 	ID             uint   `json:"id"`
 	Name           string `json:"name"`
 	FollowCount    int    `json:"follow_count"`
@@ -41,10 +41,10 @@ type CommentListResponse struct {
 }
 
 type CommentResItem struct {
-	ID         uint      `json:"id"`
-	User       Author    `json:"user"`
-	Content    string    `json:"content"`
-	CreateDate time.Time `json:"create_date"`
+	ID         uint         `json:"id"`
+	User       UserResponse `json:"user"`
+	Content    string       `json:"content"`
+	CreateDate time.Time    `json:"create_date"`
 }
 
 type CommentResponse struct {

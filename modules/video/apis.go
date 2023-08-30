@@ -63,7 +63,7 @@ func GetFeed(c *gin.Context) {
 		// 查询favorites表，看看哪些视频被用户点赞过
 		var likedVideoIds []uint
 		db.Table("favorites").
-			Where("user_id = ? AND video_id in (?)\n", userId, videoIds).
+			Where("user_id = ? AND video_id in (?)\n", userId, videoIds). // TODO: \n???
 			Pluck("video_id", &likedVideoIds)
 
 		for _, id := range likedVideoIds {
@@ -83,7 +83,7 @@ func GetFeed(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    isLiked,
-			Author: utils.Author{
+			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
@@ -170,7 +170,7 @@ func GetUserVideos(c *gin.Context) {
 			CommentCount:  v.CommentCount,
 			Title:         v.Title,
 			IsFavorite:    isLiked,
-			Author: utils.Author{
+			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
 				Avatar:         v.User.Profile.Avatar,
