@@ -53,7 +53,7 @@ func Action(c *gin.Context) {
 			return
 		}
 	case "2": // Un-favorite
-		// If current user hasn't liked this video, unlike is not allowed
+		// If current user hasn't liked this video, unlike is not allowed. TODO: any better method?
 		var count int64
 		db.Model(&models.Favorite{}).Where("user_id = ? AND video_id = ?", userId, videoIdInt).Count(&count)
 		if count == 0 {
@@ -65,16 +65,18 @@ func Action(c *gin.Context) {
 		}
 		// TODO: Cannot unlike other's like
 
-		// Failed to delete the like record for some reason
+		favoriteToDelete := models.Favorite{
+			UserID:  userId,
+			VideoID: uint(videoIdInt),
+		}
 		if err := db.Where("user_id = ? AND video_id = ?", userId, videoIdInt).
-			Delete(&models.Favorite{}).Error; err != nil {
+			Delete(&favoriteToDelete).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status_code": 1,
 				"status_msg":  "Failed to un-favorite",
 			})
 			return
 		}
-
 	default:
 		// If actionType is not 1 nor 2
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -120,8 +122,29 @@ func GetLikeVideos(c *gin.Context) {
 	db.Preload("User").Preload("User.Profile").
 		Where("id IN (?)", videoIds).Find(&videos)
 
+	// 查询视频列表中有哪些视频发布者是当前用户关注的
+	tokenString := c.DefaultQuery("token", "")
+	currentUserId, _ := utils.ValidateToken(tokenString)
+	var creatorIdsSet = make(map[uint]bool)
+	for _, v := range videos {
+		creatorIdsSet[v.UserID] = true
+	}
+	var creatorIds []uint
+	for id := range creatorIdsSet {
+		creatorIds = append(creatorIds, id)
+	}
+	var followedIds []uint
+	db.Table("relations").
+		Where("from_user_id = ? AND to_user_id IN ?", currentUserId, creatorIds).
+		Pluck("to_user_id", &followedIds)
+	var followedIdSet = make(map[uint]bool)
+	for _, id := range followedIds {
+		followedIdSet[id] = true
+	}
+
 	var videoResList []utils.VideoResItem
 	for _, v := range videos {
+		isFollowed := followedIdSet[v.UserID]
 		videoResList = append(videoResList, utils.VideoResItem{
 			ID:            v.ID,
 			PlayUrl:       v.PlayUrl,
@@ -133,6 +156,7 @@ func GetLikeVideos(c *gin.Context) {
 			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
+				IsFollow:       isFollowed,
 				Avatar:         v.User.Profile.Avatar,
 				Background:     v.User.Profile.Background,
 				Signature:      v.User.Profile.Signature,

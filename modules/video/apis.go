@@ -52,22 +52,38 @@ func GetFeed(c *gin.Context) {
 	userId, _ := utils.ValidateToken(tokenString)
 	isLoggedIn := userId > 0
 
-	// 如果当前已登录，我们需要知道返回的MaxVideos个视频中哪些被用户已经点赞过
+	// 如果当前已登录，我们需要：1. 知道返回的MaxVideos个视频中哪些被用户已经点赞过
+	// 2. 知道其中哪些视频发布者是当前登录用户关注的
 	var likedVideoIdSet = make(map[uint]bool)
+	var followedVideoCreatorIdSet = make(map[uint]bool)
 	if isLoggedIn == true {
-		// 生成视频ID列表
+		// 生成视频 ID 列表和视频发布者 ID 列表
 		var videoIds []uint
+		var creatorIds []uint
 		for _, video := range videos {
 			videoIds = append(videoIds, video.ID)
+			creatorIds = append(creatorIds, video.UserID)
 		}
-		// 查询favorites表，看看哪些视频被用户点赞过
+		// 查询 favorites 表，看看哪些视频被用户点赞过
 		var likedVideoIds []uint
 		db.Table("favorites").
-			Where("user_id = ? AND video_id in (?)\n", userId, videoIds). // TODO: \n???
+			Where("user_id = ? AND video_id IN ?", userId, videoIds).
 			Pluck("video_id", &likedVideoIds)
 
+		// 查询 relations 表，看看当前用户关注了哪些视频发布者
+		var followedCreatorIds []uint
+		db.Table("relations").
+			Where("from_user_id = ? AND to_user_id IN ?", userId, creatorIds).
+			Pluck("to_user_id", &followedCreatorIds)
+
+		// 将视频 ID 放入哈希表
 		for _, id := range likedVideoIds {
 			likedVideoIdSet[id] = true
+		}
+
+		// 将被关注的视频发布者 ID 放入哈希表
+		for _, id := range followedCreatorIds {
+			followedVideoCreatorIdSet[id] = true
 		}
 	}
 
@@ -75,6 +91,7 @@ func GetFeed(c *gin.Context) {
 	for _, v := range videos {
 		// 将查询的数据填充到返回的结构体中
 		_, isLiked := likedVideoIdSet[v.ID]
+		_, isFollowed := followedVideoCreatorIdSet[v.UserID]
 		videoResList = append(videoResList, utils.VideoResItem{
 			ID:            v.ID,
 			PlayUrl:       v.PlayUrl,
@@ -86,6 +103,7 @@ func GetFeed(c *gin.Context) {
 			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
+				IsFollow:       isFollowed,
 				Avatar:         v.User.Profile.Avatar,
 				Background:     v.User.Profile.Background,
 				Signature:      v.User.Profile.Signature,
@@ -101,7 +119,7 @@ func GetFeed(c *gin.Context) {
 	// 计算nextTime
 	var nextTime int64
 	if len(videos) > 0 {
-		nextTime = videos[len(videos)-1].PublishTime.Unix()
+		nextTime = videos[len(videos)-1].PublishTime.UnixMilli()
 	}
 
 	resp := utils.VideoResponse{
@@ -147,10 +165,12 @@ func GetUserVideos(c *gin.Context) {
 		videoIds = append(videoIds, v.ID)
 	}
 
-	// 在这些视频ID中，查询哪些被自己点赞过
+	// 在这些视频ID中，查询哪些被当前用户点赞过
+	tokenString := c.DefaultQuery("token", "")
+	currentUserId, _ := utils.ValidateToken(tokenString)
 	var likedVideoIds []uint
 	db.Table("favorites").
-		Where("user_id = ? AND video_id IN (?)", userId, videoIds).
+		Where("user_id = ? AND video_id IN (?)", currentUserId, videoIds).
 		Pluck("video_id", &likedVideoIds)
 
 	// 将这些ID放进哈希表，以便在O(1)时间内查询某个视频是否被自己点赞过
@@ -158,6 +178,11 @@ func GetUserVideos(c *gin.Context) {
 	for _, id := range likedVideoIds {
 		likedVideoIdSet[id] = true
 	}
+
+	// 查询当前登录用户是否关注了列表的发布者
+	var relation models.Relation
+	result := db.Where("from_user_id = ? AND to_user_id = ?", currentUserId, userId).First(&relation)
+	isFollowed := result.RowsAffected > 0
 
 	var videoResList []utils.VideoResItem
 	for _, v := range videos {
@@ -173,6 +198,7 @@ func GetUserVideos(c *gin.Context) {
 			Author: utils.UserResponse{
 				ID:             v.User.ID,
 				Name:           v.User.Username,
+				IsFollow:       isFollowed,
 				Avatar:         v.User.Profile.Avatar,
 				Background:     v.User.Profile.Background,
 				Signature:      v.User.Profile.Signature,
