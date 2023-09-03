@@ -3,13 +3,19 @@ package config
 import (
 	"app/modules/models"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"log"
 	"os"
+	"sync"
 )
 
-// IsTesting 通过设置环境变量来让程序判断当前是测试环境还是生产环境
+// IsTesting 通过设置环境变量来让程序判断当前是单元测试还是运行后端服务
 var IsTesting = os.Getenv("GO_TESTING") == "true"
 
 // InitGinEngine 初始化路由函数
@@ -58,4 +64,30 @@ var Router *gin.Engine
 // SetupRouter 调用初始化路由函数，赋值给Router
 func SetupRouter(db *gorm.DB) {
 	Router = InitGinEngine(db)
+}
+
+var (
+	onceAwsSession  sync.Once
+	sess            *session.Session
+	S3Client        *s3.S3
+	err             error
+	AwsBucketRegion string = os.Getenv("AWS_BUCKET_REGION")
+)
+
+func InitAwsSession() {
+	onceAwsSession.Do(func() {
+		sess, err = session.NewSession(&aws.Config{
+			Region: aws.String(AwsBucketRegion),
+			Credentials: credentials.NewStaticCredentials(
+				os.Getenv("AWS_ACCESS_KEY_ID"),
+				os.Getenv("AWS_SECRET_ACCESS_KEY"),
+				"",
+			),
+		})
+		if err != nil {
+			log.Fatalf("Failed to initialize AWS session: %v", err)
+		}
+
+		S3Client = s3.New(sess)
+	})
 }
