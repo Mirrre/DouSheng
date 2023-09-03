@@ -1,15 +1,21 @@
 package video
 
 import (
+	"app/config"
 	"app/consts"
 	"app/modules/models"
 	"app/utils"
+	"bytes"
 	"fmt"
+	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
+
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
 // GetFeed 视频流接口，返回早于latest_time发布的MaxVideos个视频
@@ -216,4 +222,164 @@ func GetUserVideos(c *gin.Context) {
 		StatusMsg:  "Success",
 		VideoList:  videoResList,
 	})
+}
+
+func Publish(c *gin.Context) {
+	// 验证视频标题
+	title := c.DefaultPostForm("title", "")
+	if len(title) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Missing title",
+		})
+		return
+	}
+
+	// 验证视频文件
+	file, err := c.FormFile("data")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Invalid data",
+		})
+		fmt.Println("Invalid data")
+		return
+	}
+
+	// TODO: 验证文件类型为视频类型
+	//fileType := file.Header.Get("Content-Type")
+	//if !strings.Contains(fileType, "video/") {
+	//	c.JSON(http.StatusBadRequest, gin.H{
+	//		"status_code": 1,
+	//		"status_msg":  "Invalid video data",
+	//	})
+	//	fmt.Println("Invalid video data")
+	//	return
+	//}
+
+	// 检查文件大小
+	if file.Size > consts.MaxVideoSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Video size limit exceeds",
+		})
+		fmt.Println("Video size limit exceeds")
+		return
+	}
+
+	// 验证 user_id
+	tokenString := c.DefaultPostForm("token", "")
+	userId, _ := utils.ValidateToken(tokenString)
+
+	// 生成文件名
+	now := time.Now()
+	nowUnix := now.UnixMilli()
+	filename := fmt.Sprintf("%d-%d", userId, nowUnix)
+	videoKey := filename + ".mp4"
+	coverKey := filename + ".jpg"
+	videoPath := "media/" + filename + ".mp4"
+	coverPath := "media/" + filename + ".jpg"
+
+	// TODO: 转码成mp4并压缩
+
+	// 保存文件
+	if err := c.SaveUploadedFile(file, videoPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to upload video",
+		})
+		return
+	}
+	defer os.Remove(videoPath)
+	defer os.Remove(coverPath)
+
+	// 生成视频封面
+	if err := GenerateCover(videoPath, coverPath); err != nil {
+		os.Remove(videoPath)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		return
+	}
+
+	videoUrl := fmt.Sprintf(
+		"https://s3.%s.amazonaws.com/%s/%s",
+		config.AwsBucketRegion,
+		consts.AwsBucketName,
+		videoKey,
+	)
+
+	coverUrl := fmt.Sprintf(
+		"https://s3.%s.amazonaws.com/%s/%s",
+		config.AwsBucketRegion,
+		consts.AwsBucketName,
+		coverKey,
+	)
+
+	// 更新 videos 表
+	videoRecord := models.Video{
+		UserID:      userId,
+		Title:       title,
+		PlayUrl:     videoUrl,
+		CoverUrl:    coverUrl,
+		PublishTime: now,
+	}
+	db := c.MustGet("db").(*gorm.DB)
+	tx := db.Create(&videoRecord)
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to create video record",
+		})
+		return
+	}
+
+	err = utils.UploadFileToS3(videoPath, videoKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		tx.Rollback()
+		return
+	}
+
+	err = utils.UploadFileToS3(coverPath, coverKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		tx.Rollback()
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code": 0,
+		"status_msg":  "Success",
+	})
+}
+
+func GenerateCover(videoPath, coverPath string) (err error) {
+	buf := bytes.NewBuffer(nil)
+	if err := ffmpeg.Input(videoPath).
+		Filter("select", ffmpeg.Args{fmt.Sprintf("gte(n,%d)", 1)}).
+		Output("pipe:", ffmpeg.KwArgs{
+			"vframes": 1, "format": "image2", "vcodec": "mjpeg", "pix_fmt": "yuv420p"}).
+		WithOutput(buf, os.Stdout).
+		Run(); err != nil {
+		return fmt.Errorf("failed to process video file")
+	}
+
+	img, err := imaging.Decode(buf)
+	if err != nil {
+		return fmt.Errorf("failed to decode image")
+	}
+
+	if err := imaging.Save(img, coverPath); err != nil {
+		return fmt.Errorf("failed to save image")
+	}
+
+	return nil
 }
