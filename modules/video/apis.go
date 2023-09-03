@@ -9,13 +9,14 @@ import (
 	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
+	"github.com/h2non/filetype"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-
-	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
 // GetFeed 视频流接口，返回早于latest_time发布的MaxVideos个视频
@@ -256,6 +257,35 @@ func Publish(c *gin.Context) {
 	//	fmt.Println("Invalid video data")
 	//	return
 	//}
+	openedFile, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to open file",
+		})
+		return
+	}
+	defer openedFile.Close()
+
+	// 读取文件的前261字节来验证类型
+	fileHead := make([]byte, 261)
+	_, err = openedFile.Read(fileHead)
+	if err != nil && err != io.EOF {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to read file",
+		})
+		return
+	}
+
+	// 用 filetype 库验证文件类型
+	if !filetype.IsVideo(fileHead) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Please provide a video file",
+		})
+		return
+	}
 
 	// 检查文件大小
 	if file.Size > consts.MaxVideoSize {
