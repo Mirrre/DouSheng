@@ -33,20 +33,20 @@ services:
       AWS_BUCKET_REGION: ${AWS_BUCKET_REGION}
     command: ["/app/wait-for-it.sh", "db:3306", "--", "go", "run", "."]
 
-  minio:
-    image: quay.io/minio/minio
-    volumes:
-      - ./minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9090:9090"
-    environment:
-      MINIO_ROOT_USER: ROOTUSER
-      MINIO_ROOT_PASSWORD: CHANGEME123
-    command: server /data --console-address ":9090"
-    depends_on:
-      - backend
+#  minio:
+#    image: quay.io/minio/minio
+#    volumes:
+#      - ./minio_data:/data
+#    ports:
+#      - "9000:9000"
+#      - "9090:9090"
+#    environment:
+#      MINIO_ROOT_USER: ROOTUSER
+#      MINIO_ROOT_PASSWORD: CHANGEME123
+#    command: server /data --console-address ":9090"
+#    depends_on:
+#      - backend
 
 volumes:
   db_data:
-  minio_data:
+#  minio_data:

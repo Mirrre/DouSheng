@@ -278,7 +278,7 @@ func GetFriends(c *gin.Context) {
 	// 查询 followingIds 中有哪些人关注了 user_id
 	var friends []models.Relation
 	if tx := db.Preload("ToUser").Preload("ToUser.Profile").
-		Where("to_user_id = ? AND from_user_id IN (?)", userIdString, followingIds).
+		Where("from_user_id = ? AND to_user_id IN (?)", userIdString, followingIds).
 		Find(&friends); tx.Error != nil {
 		c.JSON(http.StatusInternalServerError, utils.CommentResponse{
 			StatusCode: 1,
