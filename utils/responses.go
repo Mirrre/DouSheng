@@ -60,9 +60,9 @@ type MessageHistoryResponse struct {
 }
 
 type MessageResItem struct {
-	ID         uint      `json:"id"`
-	ToUserId   uint      `json:"to_user_id"`
-	FromUserId uint      `json:"from_user_id"`
-	Content    string    `json:"content"`
-	CreateTime time.Time `json:"create_time"`
+	ID         uint   `json:"id"`
+	ToUserId   uint   `json:"to_user_id"`
+	FromUserId uint   `json:"from_user_id"`
+	Content    string `json:"content"`
+	CreateTime int64  `json:"create_time"`
 }
