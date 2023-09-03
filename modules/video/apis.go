@@ -9,13 +9,14 @@ import (
 	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
+	"github.com/h2non/filetype"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-
-	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
 // GetFeed 视频流接口，返回早于latest_time发布的MaxVideos个视频
@@ -225,6 +226,7 @@ func GetUserVideos(c *gin.Context) {
 }
 
 func Publish(c *gin.Context) {
+	// TODO: 将所有 ffmpeg 相关操作改为异步/消息队列来完成
 	// 验证视频标题
 	title := c.DefaultPostForm("title", "")
 	if len(title) == 0 {
@@ -246,16 +248,36 @@ func Publish(c *gin.Context) {
 		return
 	}
 
-	// TODO: 验证文件类型为视频类型
-	//fileType := file.Header.Get("Content-Type")
-	//if !strings.Contains(fileType, "video/") {
-	//	c.JSON(http.StatusBadRequest, gin.H{
-	//		"status_code": 1,
-	//		"status_msg":  "Invalid video data",
-	//	})
-	//	fmt.Println("Invalid video data")
-	//	return
-	//}
+	// 验证文件类型为视频类型
+	openedFile, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to open file - invalid data",
+		})
+		return
+	}
+	defer openedFile.Close()
+
+	// 读取文件的前261字节来验证类型
+	fileHead := make([]byte, 261)
+	_, err = openedFile.Read(fileHead)
+	if err != nil && err != io.EOF {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to read file - invalid data",
+		})
+		return
+	}
+
+	// 用 filetype 库验证文件类型
+	if !filetype.IsVideo(fileHead) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Please provide a video file",
+		})
+		return
+	}
 
 	// 检查文件大小
 	if file.Size > consts.MaxVideoSize {
@@ -275,27 +297,37 @@ func Publish(c *gin.Context) {
 	now := time.Now()
 	nowUnix := now.UnixMilli()
 	filename := fmt.Sprintf("%d-%d", userId, nowUnix)
-	videoKey := filename + ".mp4"
-	coverKey := filename + ".jpg"
-	videoPath := "media/" + filename + ".mp4"
-	coverPath := "media/" + filename + ".jpg"
 
-	// TODO: 转码成mp4并压缩
-
-	// 保存文件
-	if err := c.SaveUploadedFile(file, videoPath); err != nil {
+	// 转码成mp4并压缩
+	tempInputVideoPath := "tmp/" + filename               // 源文件暂存路径
+	tempTranscodedVideoPath := "tmp/" + filename + ".mp4" // 转码后的文件暂存路径
+	tempCoverPath := "tmp/" + filename + ".jpg"           // 视频封面暂存路径
+	// 保存源文件到其暂存路径
+	if err := c.SaveUploadedFile(file, tempInputVideoPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
-			"status_msg":  "Failed to upload video",
+			"status_msg":  "Failed to save uploaded file",
 		})
 		return
 	}
-	defer os.Remove(videoPath)
-	defer os.Remove(coverPath)
+
+	// 函数结束后删除临时文件
+	defer os.Remove(tempInputVideoPath)
+	defer os.Remove(tempTranscodedVideoPath)
+	defer os.Remove(tempCoverPath)
+
+	// 转码
+	err = TranscodeToMp4(tempInputVideoPath, tempTranscodedVideoPath)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to transcode video",
+		})
+	}
 
 	// 生成视频封面
-	if err := GenerateCover(videoPath, coverPath); err != nil {
-		os.Remove(videoPath)
+	if err := GenerateCover(tempTranscodedVideoPath, tempCoverPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
 			"status_msg":  err.Error(),
@@ -303,6 +335,8 @@ func Publish(c *gin.Context) {
 		return
 	}
 
+	videoKey := filename + ".mp4"
+	coverKey := filename + ".jpg"
 	videoUrl := fmt.Sprintf(
 		"https://s3.%s.amazonaws.com/%s/%s",
 		config.AwsBucketRegion,
@@ -335,7 +369,8 @@ func Publish(c *gin.Context) {
 		return
 	}
 
-	err = utils.UploadFileToS3(videoPath, videoKey)
+	// 将视频和封面上传到S3
+	err = utils.UploadFileToS3(tempTranscodedVideoPath, videoKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
@@ -345,7 +380,7 @@ func Publish(c *gin.Context) {
 		return
 	}
 
-	err = utils.UploadFileToS3(coverPath, coverKey)
+	err = utils.UploadFileToS3(tempCoverPath, coverKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
@@ -381,5 +416,14 @@ func GenerateCover(videoPath, coverPath string) (err error) {
 		return fmt.Errorf("failed to save image")
 	}
 
+	return nil
+}
+
+func TranscodeToMp4(inputPath, outputPath string) (err error) {
+	err = ffmpeg.Input(inputPath).
+		Output(outputPath, ffmpeg.KwArgs{"c:v": "libx264", "b:v": "500k", "c:a": "aac"}).Run()
+	if err != nil {
+		return err
+	}
 	return nil
 }
