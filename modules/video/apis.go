@@ -10,9 +10,11 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"gorm.io/gorm"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -271,11 +273,21 @@ func Publish(c *gin.Context) {
 	}
 
 	// 用 filetype 库验证文件类型
-	if !filetype.IsVideo(fileHead) {
+	//if !filetype.IsVideo(fileHead) {
+	//	c.JSON(http.StatusBadRequest, gin.H{
+	//		"status_code": 1,
+	//		"status_msg":  "Please provide a video file",
+	//	})
+	//	return
+	//}
+
+	kind, _ := filetype.Match(fileHead)
+	if kind != matchers.TypeMp4 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status_code": 1,
-			"status_msg":  "Please provide a video file",
+			"status_msg":  "Please submit .mp4 file",
 		})
+		log.Print("Please submit .mp4 file")
 		return
 	}
 
@@ -285,7 +297,7 @@ func Publish(c *gin.Context) {
 			"status_code": 1,
 			"status_msg":  "Video size limit exceeds",
 		})
-		fmt.Println("Video size limit exceeds")
+		log.Print("Video size limit exceeds")
 		return
 	}
 
@@ -299,35 +311,38 @@ func Publish(c *gin.Context) {
 	filename := fmt.Sprintf("%d-%d", userId, nowUnix)
 
 	// 转码成mp4并压缩
-	tempInputVideoPath := "tmp/" + filename               // 源文件暂存路径
-	tempTranscodedVideoPath := "tmp/" + filename + ".mp4" // 转码后的文件暂存路径
-	tempCoverPath := "tmp/" + filename + ".jpg"           // 视频封面暂存路径
+	tempInputVideoPath := "tmp/" + filename // 源文件暂存路径
+	//tempTranscodedVideoPath := "tmp/" + filename + ".mp4" // 转码后的文件暂存路径
+	tempCoverPath := "tmp/" + filename + ".jpg" // 视频封面暂存路径
 	// 保存源文件到其暂存路径
 	if err := c.SaveUploadedFile(file, tempInputVideoPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
 			"status_msg":  "Failed to save uploaded file",
 		})
+		log.Printf("Failed to save uploaded file. Err: %s", err)
 		return
 	}
 
 	// 函数结束后删除临时文件
 	defer os.Remove(tempInputVideoPath)
-	defer os.Remove(tempTranscodedVideoPath)
+	//defer os.Remove(tempTranscodedVideoPath)
 	defer os.Remove(tempCoverPath)
 
 	// 转码
-	err = TranscodeToMp4(tempInputVideoPath, tempTranscodedVideoPath)
-	if err != nil {
-		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status_code": 1,
-			"status_msg":  "Failed to transcode video",
-		})
-	}
+	//err = TranscodeToMp4(tempInputVideoPath, tempTranscodedVideoPath)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	c.JSON(http.StatusInternalServerError, gin.H{
+	//		"status_code": 1,
+	//		"status_msg":  "Failed to transcode video",
+	//	})
+	//	log.Printf("Failed to transcode video. Err: %s", err)
+	//	return
+	//}
 
 	// 生成视频封面
-	if err := GenerateCover(tempTranscodedVideoPath, tempCoverPath); err != nil {
+	if err := GenerateCover(tempInputVideoPath, tempCoverPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
 			"status_msg":  err.Error(),
@@ -366,11 +381,12 @@ func Publish(c *gin.Context) {
 			"status_code": 1,
 			"status_msg":  "Failed to create video record",
 		})
+		log.Printf("Failed to create db record. Err: %s", err)
 		return
 	}
 
 	// 将视频和封面上传到S3
-	err = utils.UploadFileToS3(tempTranscodedVideoPath, videoKey)
+	err = utils.UploadFileToS3(tempInputVideoPath, videoKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
@@ -401,7 +417,7 @@ func GenerateCover(videoPath, coverPath string) (err error) {
 	if err := ffmpeg.Input(videoPath).
 		Filter("select", ffmpeg.Args{fmt.Sprintf("gte(n,%d)", 1)}).
 		Output("pipe:", ffmpeg.KwArgs{
-			"vframes": 1, "format": "image2", "vcodec": "mjpeg", "pix_fmt": "yuv420p"}).
+			"vframes": 1, "format": "image2", "vcodec": "mjpeg", "pix_fmt": "yuvj420p"}).
 		WithOutput(buf, os.Stdout).
 		Run(); err != nil {
 		return fmt.Errorf("failed to process video file")
