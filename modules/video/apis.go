@@ -13,6 +13,7 @@ import (
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"gorm.io/gorm"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -308,6 +309,7 @@ func Publish(c *gin.Context) {
 			"status_code": 1,
 			"status_msg":  "Failed to save uploaded file",
 		})
+		log.Printf("Failed to save uploaded file. Err: %s", err)
 		return
 	}
 
@@ -324,6 +326,8 @@ func Publish(c *gin.Context) {
 			"status_code": 1,
 			"status_msg":  "Failed to transcode video",
 		})
+		log.Printf("Failed to transcode video. Err: %s", err)
+		return
 	}
 
 	// 生成视频封面
@@ -366,6 +370,7 @@ func Publish(c *gin.Context) {
 			"status_code": 1,
 			"status_msg":  "Failed to create video record",
 		})
+		log.Printf("Failed to create db record. Err: %s", err)
 		return
 	}
 
