@@ -5,11 +5,11 @@
 package utils
 
 import (
-  	"app/config"
-  	"app/modules/models"
-  	"fmt"
-  	"github.com/gin-gonic/gin"
-  	"gorm.io/gorm"
+	"app/config"
+	"app/modules/models"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 var TestRouter *gin.Engine
@@ -17,10 +17,10 @@ var dsn = config.SetDsn()
 var db, err = config.InitDatabase(dsn)
 
 func Setup() {
-  	if err != nil {
-  		  panic("Failed to connect database.")
-  	}
-  	config.SetupRouter(db)
+	if err != nil {
+		panic("Failed to connect database.")
+	}
+	config.SetupRouter(db)
 }
 
 func Teardown() {
