@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"net/http"
+	"strconv"
 )
 
 // Register 处理用户注册的API请求
@@ -62,16 +63,35 @@ func Register(c *gin.Context) {
 
 // GetUser 处理获取单个用户的API请求
 func GetUser(c *gin.Context) {
-	id := c.Query("user_id") // 从路径中获取用户ID
+	userIdString := c.DefaultQuery("user_id", "") // 从路径中获取用户ID
+	// 验证 user_id
+	userIdInt, err := strconv.Atoi(userIdString)
+	if err != nil || userIdInt <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Invalid target user ID.",
+			"user":        nil,
+		})
+		return
+	}
 
+	// 获取用户信息
 	var user models.User
 	db := c.MustGet("db").(*gorm.DB)
-	if err := db.First(&user, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found."})
+	if err := db.Preload("Profile").First(&user, userIdString).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) { // 目标用户不存在
+			c.JSON(http.StatusNotFound, gin.H{
+				"status_code": 1,
+				"status_msg":  "User not found.",
+				"user":        nil,
+			})
 			fmt.Println(http.StatusNotFound, "User not found.")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error."})
+			c.JSON(http.StatusNotFound, gin.H{
+				"status_code": 1,
+				"status_msg":  "User not found.",
+				"user":        nil,
+			})
 			fmt.Println(http.StatusInternalServerError, "Database error.")
 		}
 		return
@@ -81,7 +101,8 @@ func GetUser(c *gin.Context) {
 	var relation models.Relation
 	tokenString := c.DefaultQuery("token", "")
 	currentUserId, _ := utils.ValidateToken(tokenString)
-	result := db.Where("from_user_id = ? AND to_user_id = ?", currentUserId, id).First(&relation)
+	result := db.Where(
+		"from_user_id = ? AND to_user_id = ?", currentUserId, userIdString).First(&relation)
 	isFollowed := result.RowsAffected > 0
 
 	userResponse := map[string]interface{}{
