@@ -25,7 +25,7 @@ func Setup() {
 
 func Teardown() {
 	TestRouter = nil
-	err := db.Migrator().DropTable(&models.User{}, &models.UserProfile{})
+	err := db.Migrator().DropTable(&models.User{}, &models.UserProfile{}, &models.Relation{})
 	if err != nil {
 		fmt.Println("Failed to drop DB table.")
 	}
