@@ -151,6 +151,7 @@ func GetHistory(c *gin.Context) {
 	var chatHistory []models.Message
 	if err := db.Where("from_user_id = ? AND to_user_id = ? AND created_at > ?", fromUserId, toUserId, preMsgTime).
 		Or("from_user_id = ? AND to_user_id = ? AND created_at > ?", toUserId, fromUserId, preMsgTime).
+		Order("created_at").
 		Find(&chatHistory).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status_code": 1,
