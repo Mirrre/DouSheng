@@ -48,10 +48,14 @@ func InitDatabase(dsn string) (*gorm.DB, error) {
 
 // SetDsn 自动判断测试/生产环境来生成不同的dsn，对应不同的数据库
 func SetDsn() string {
-	User := os.Getenv("MYSQL_USER")
-	Pass := os.Getenv("MYSQL_PASSWORD")
-	Host := os.Getenv("MYSQL_HOST")
-	Port := os.Getenv("MYSQL_PORT")
+	//User := os.Getenv("MYSQL_USER")
+	//Pass := os.Getenv("MYSQL_PASSWORD")
+	//Host := os.Getenv("MYSQL_HOST")
+	//Port := os.Getenv("MYSQL_PORT")
+	User := "root"
+	Pass := "lps123456"
+	Host := "127.0.0.1"
+	Port := "3306"
 	if IsTesting {
 		return fmt.Sprintf("%s:%s@tcp(%s:%s)/gotest?charset=utf8mb4&parseTime=True&loc=Local", User, Pass, Host, Port)
 	}
