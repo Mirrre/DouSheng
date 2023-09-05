@@ -227,14 +227,16 @@ func GetUserVideos(c *gin.Context) {
 	})
 }
 
+// TODO: 将所有 ffmpeg 相关操作改为异步/消息队列来完成
+
 func Publish(c *gin.Context) {
 	// TODO: 将所有 ffmpeg 相关操作改为异步/消息队列来完成
 	// 验证视频标题
 	title := c.DefaultPostForm("title", "")
-	if len(title) == 0 {
+	if len(title) == 0 || len(title) > 255 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status_code": 1,
-			"status_msg":  "Missing title",
+			"status_msg":  "Title is required and must be between 0 - 255 characters.",
 		})
 		return
 	}
@@ -273,14 +275,6 @@ func Publish(c *gin.Context) {
 	}
 
 	// 用 filetype 库验证文件类型
-	//if !filetype.IsVideo(fileHead) {
-	//	c.JSON(http.StatusBadRequest, gin.H{
-	//		"status_code": 1,
-	//		"status_msg":  "Please provide a video file",
-	//	})
-	//	return
-	//}
-
 	kind, _ := filetype.Match(fileHead)
 	if kind != matchers.TypeMp4 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -310,7 +304,7 @@ func Publish(c *gin.Context) {
 	nowUnix := now.UnixMilli()
 	filename := fmt.Sprintf("%d-%d", userId, nowUnix)
 
-	// 转码成mp4并压缩
+	// 暂存文件准备上传
 	tempInputVideoPath := "tmp/" + filename // 源文件暂存路径
 	//tempTranscodedVideoPath := "tmp/" + filename + ".mp4" // 转码后的文件暂存路径
 	tempCoverPath := "tmp/" + filename + ".jpg" // 视频封面暂存路径
@@ -329,17 +323,7 @@ func Publish(c *gin.Context) {
 	//defer os.Remove(tempTranscodedVideoPath)
 	defer os.Remove(tempCoverPath)
 
-	// 转码
-	//err = TranscodeToMp4(tempInputVideoPath, tempTranscodedVideoPath)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	c.JSON(http.StatusInternalServerError, gin.H{
-	//		"status_code": 1,
-	//		"status_msg":  "Failed to transcode video",
-	//	})
-	//	log.Printf("Failed to transcode video. Err: %s", err)
-	//	return
-	//}
+	// TODO: 转码
 
 	// 生成视频封面
 	if err := GenerateCover(tempInputVideoPath, tempCoverPath); err != nil {
@@ -403,6 +387,158 @@ func Publish(c *gin.Context) {
 			"status_msg":  err.Error(),
 		})
 		tx.Rollback()
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status_code": 0,
+		"status_msg":  "Success",
+	})
+}
+
+func PublishToMinIO(c *gin.Context) {
+	// 验证视频标题
+	title := c.DefaultPostForm("title", "")
+	if len(title) == 0 || len(title) > 255 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Title is required and must be between 0 - 255 characters.",
+		})
+		return
+	}
+
+	// 验证视频文件
+	file, err := c.FormFile("data")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Invalid data",
+		})
+		fmt.Println("Invalid data")
+		return
+	}
+
+	// 验证文件类型为视频类型
+	openedFile, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to open file - invalid data",
+		})
+		return
+	}
+	defer openedFile.Close()
+
+	// 读取文件的前261字节来验证类型
+	fileHead := make([]byte, 261)
+	_, err = openedFile.Read(fileHead)
+	if err != nil && err != io.EOF {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to read file - invalid data",
+		})
+		return
+	}
+
+	// 用 filetype 库验证文件类型
+	kind, _ := filetype.Match(fileHead)
+	if kind != matchers.TypeMp4 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Please submit .mp4 file",
+		})
+		log.Print("Please submit .mp4 file")
+		return
+	}
+
+	// 检查文件大小
+	if file.Size > consts.MaxVideoSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status_code": 1,
+			"status_msg":  "Video size limit exceeds",
+		})
+		log.Print("Video size limit exceeds")
+		return
+	}
+
+	// 验证 user_id
+	tokenString := c.DefaultPostForm("token", "")
+	userId, _ := utils.ValidateToken(tokenString)
+
+	// 生成文件名
+	now := time.Now()
+	nowUnix := now.UnixMilli()
+	filename := fmt.Sprintf("%d-%d", userId, nowUnix)
+
+	// 暂存文件准备上传
+	tempInputVideoPath := "tmp/" + filename // 源文件暂存路径
+	//tempTranscodedVideoPath := "tmp/" + filename + ".mp4" // 转码后的文件暂存路径
+	tempCoverPath := "tmp/" + filename + ".jpg" // 视频封面暂存路径
+	// 保存源文件到其暂存路径
+	if err := c.SaveUploadedFile(file, tempInputVideoPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to save uploaded file",
+		})
+		log.Printf("Failed to save uploaded file. Err: %s", err)
+		return
+	}
+
+	// 函数结束后删除临时文件
+	defer os.Remove(tempInputVideoPath)
+	//defer os.Remove(tempTranscodedVideoPath)
+	defer os.Remove(tempCoverPath)
+
+	// TODO: 转码
+
+	// 生成视频封面
+	if err := GenerateCover(tempInputVideoPath, tempCoverPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		return
+	}
+
+	// 上传到 minIO
+	videoName := filename + ".mp4"
+	coverName := filename + ".jpg"
+	videoUrl, err := utils.UploadFileToMinIO(
+		tempInputVideoPath, videoName, consts.MinIOBucketName, consts.UrlExpiration)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		return
+	}
+
+	coverUrl, err := utils.UploadFileToMinIO(
+		tempCoverPath, coverName, consts.MinIOBucketName, consts.UrlExpiration)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  err.Error(),
+		})
+		return
+	}
+
+	// 更新 videos 表
+	videoRecord := models.Video{
+		UserID:      userId,
+		Title:       title,
+		PlayUrl:     videoUrl,
+		CoverUrl:    coverUrl,
+		PublishTime: now,
+	}
+	db := c.MustGet("db").(*gorm.DB)
+	tx := db.Create(&videoRecord)
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status_code": 1,
+			"status_msg":  "Failed to create video record",
+		})
+		log.Printf("Failed to create db record. Err: %s", err)
 		return
 	}
 
