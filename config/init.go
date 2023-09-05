@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	minioCred "github.com/minio/minio-go/v7/pkg/credentials"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
@@ -70,12 +72,13 @@ func SetupRouter(db *gorm.DB) {
 	Router = InitGinEngine(db)
 }
 
+// 设置全局单例 AWS 客户端
 var (
 	onceAwsSession  sync.Once
 	sess            *session.Session
 	S3Client        *s3.S3
 	err             error
-	AwsBucketRegion string = os.Getenv("AWS_BUCKET_REGION")
+	AwsBucketRegion = os.Getenv("AWS_BUCKET_REGION")
 )
 
 func InitAwsSession() {
@@ -94,4 +97,23 @@ func InitAwsSession() {
 
 		S3Client = s3.New(sess)
 	})
+}
+
+// 设置全局单例 minIO 客户端
+var (
+	MinioClient *minio.Client
+	once        sync.Once
+)
+
+func InitMinioClient(endpoint, accessKeyID, secretAccessKey string, useSSL bool) error {
+	var err error
+
+	once.Do(func() {
+		MinioClient, err = minio.New(endpoint, &minio.Options{
+			Creds:  minioCred.NewStaticV4(accessKeyID, secretAccessKey, ""),
+			Secure: useSSL,
+		})
+	})
+
+	return err
 }
