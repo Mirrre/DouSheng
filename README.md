@@ -7,24 +7,17 @@
 # 文件结构
 
 
-- [config](config)
-   - [init.go](config/init.go)             *应用程序的配置文件 初始化db连接*
+- [config](config)             *应用程序的配置文件 初始化db连接*
 - [consts](consts)  *常量定义*
 - [middleware](middleware) *中间件*
 - [modules](modules)   *API功能实现*
   - [comment](modules/comment) 
-    
-   -  [favorite](modules/apis.go)   
-   -  [message](modules/apis.go) 
-   - [models](modules) *表单结构体模块*
-      - [comment.go](modules/models/comment.go)  
-      - [favorite.go](modules/models/favorite.go)   
-      - [message.go](modules/models/message.go)   
-      - [relation.go](modules/models/relation.go)        
-      - [user.go](modules/models/user.go)   
-      - [video.go](modules/models/video.go)   
+   -  [favorite](modules/favorite)   
+   -  [message](modules/message) 
+   - [models](modules/models) *表单结构体模块*
    - [relation](modules/relation)
-     - [apis.go](modules/apis.go) 
+   - [user](modules/user)
+   - [video](modules/video)
 - [utils](utils) *工具包*
    - [responses.go](utils/responses.go) *http响应结构体*
    - [testutils.go](utils/testutils.go)  *单元测试工具* 
@@ -35,6 +28,7 @@
 - [go.sum](go.sum)  *模块的预期内容*
 - [main.go](main.go) *开启服务主函数*
 - [wait-go-it.sh](wait-go-it.sh) *数据库端口响应等待脚本*
+- [LICENSE](LICENSE.txt)
  
 # 技术亮点
   ### 使用单元测试便于纠错，实现自动化postman测试
@@ -87,4 +81,4 @@ fork本仓库到你的仓库.
 
 等待 review 和合并.
 # 开源协议
-本项目采用[MIT LICENSE](LICENSE)
+本项目采用[MIT LICENSE](LICENSE.txt)
