@@ -28,14 +28,14 @@
 - [go.sum](go.sum)  *模块的预期内容*
 - [main.go](main.go) *开启服务主函数*
 - [wait-go-it.sh](wait-go-it.sh) *数据库端口响应等待脚本*
-- [LICENSE](LICENSE.txt)
+- [LICENSE](LICENSE)
  
 # 技术亮点
-  ### 使用单元测试便于纠错，实现自动化postman测试
-  ### 使用oss对象存储存放视频文件
-  ### 数据库使用索引，二分法等提高数据检索和更新速率
-  ### 返回标准HTTP状态码
-  ### 按照功能拆分文件结构
+  - 使用单元测试便于纠错，实现自动化postman测试
+  - 使用oss对象存储存放视频文件
+  - 数据库使用索引，二分法等提高数据检索和更新速率
+  - 返回标准HTTP状态码
+  - 按照功能拆分文件结构
 
 
 
@@ -81,4 +81,4 @@ fork本仓库到你的仓库.
 
 等待 review 和合并.
 # 开源协议
-本项目采用[MIT LICENSE](LICENSE.txt)
+本项目采用[MIT LICENSE](LICENSE)
